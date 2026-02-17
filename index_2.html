@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>めだか村 | Medaka Village Portfolio</title>
+    
+    <!-- React & Babel (CDN) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
+            background-color: #f0f9ff;
+            color: #334155;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- 物理挙動アコーディオン --- */
+        .accordion-content {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+            opacity: 0;
+        }
+        .accordion-content.open {
+            grid-template-rows: 1fr;
+            opacity: 1;
+        }
+        .accordion-inner {
+            min-height: 0;
+        }
+
+        /* --- Animations --- */
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 0; }
+            20% { opacity: 0.6; }
+            100% { transform: translateY(-110vh) scale(1.2); opacity: 0; }
+        }
+        .bubble {
+            position: fixed;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .fade-in-up {
+            animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- Utilities --- */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 20px -5px rgba(14, 165, 233, 0.1);
+        }
+        .text-shadow {
+            text-shadow: 0 2px 10px rgba(14, 165, 233, 0.2);
+        }
+        
+        .nav-active {
+            background-color: #0ea5e9;
+            color: white !important;
+            box-shadow: 0 8px 16px -4px rgba(14, 165, 233, 0.4);
+            transform: translateY(-2px) scale(1.05);
+        }
+        
+        /* スクロールバー非表示 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Firebase SDK & App Logic -->
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
+        import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
+        
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- Firebase Config Helper ---
+        const getFirebaseConfig = () => {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                return JSON.parse(__firebase_config);
+            }
+            return {};
+        };
+
+        const firebaseConfig = getFirebaseConfig();
+        let app, auth, db;
+        try {
+            if (Object.keys(firebaseConfig).length > 0) {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+            }
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+        }
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'medaka-final-v3';
+
+        // --- Icons (SVG) ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                home: <path d="M3 10l9-8 9 8v10a2 2 0 01-2 2H5a2 2 0 01-2-2V10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>,
+                image: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                menu: <><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><line x1="8" y1="7" x2="16" y2="7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="8" y1="17" x2="16" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                user: <><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                chevronLeft: <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+                info: <><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                x: <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+                send: <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+                clock: <><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                check: <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+                mail: <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><path d="M22 6l-10 7L2 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                twitter: <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" fill="currentColor" />,
+                copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                alert: <><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></>,
+                fish: <><path d="M2 12c0-3.8 3.5-7 9-7s9 3.2 9 7-3.5 7-9 7-9-3.2-9-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><path d="M20 12l3-3.5v7l-3-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="7" cy="10.5" r="1.5" fill="currentColor"/></>,
+                star: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>,
+                arrowDown: <path d="M12 5v14M19 12l-7 7-7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+                lock: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></>,
+                edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                trash: <><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                video: <><path d="M23 7l-7 5 7 5V7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                play: <><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M10 8l6 4-6 4V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>
+            };
+            
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+                    {icons[name] || null}
+                </svg>
+            );
+        };
+
+        // --- Data ---
+        const CATEGORIES = [
+            { 
+                id: 'standard', 
+                name: '等身イラスト', 
+                sub: 'Standard Illustration',
+                price: '12,000', 
+                desc: '配信、アクリルスタンド、MVなど多目的に使用できる高品質なイラストです。キャラクターの魅力を引き出す「生きた」立ち姿を制作します。', 
+                basePrices: [
+                    { label: 'キャラクター全身', price: '¥15,000〜' },
+                    { label: '腰上（ニーアップ）', price: '¥14,000〜' },
+                    { label: 'バストアップ', price: '¥12,000〜' }
+                ],
+                specs: '長辺～4000px前後 / 350dpi / 透過PNG / 納期1ヶ月～\n※画像サイズやファイル形式のご指定がある場合は、事前にお申し付けください。',
+                options: [
+                    { label: '新規キャラクターデザイン', price: '＋¥15,000〜' },
+                    { label: '新規衣装デザイン', price: '＋¥8,000〜' },
+                    { label: '「ぴょこぴょこ」口パク差分（配信向け）', price: '＋¥2,000' },
+                    { label: '表情差分（1種につき）', price: '＋¥500〜' },
+                    { label: '衣装・ポーズ差分', price: '＋¥3,000〜' },
+                    { label: '背景追加（風景・室内など）', price: '＋¥10,000〜' },
+                    { label: '簡単な背景（パターン・空など）', price: '＋¥2,000〜' }
+                ],
+                recommends: [
+                    'VTuber活動のメインモデルや新衣装制作に',
+                    '歌ってみたMVで「動き」や「遠近法」を感じさせる一枚が欲しい方に',
+                    'グッズ化した際に細部まで綺麗なイラストを求めている方に'
+                ]
+            },
+            { 
+                id: 'sd', 
+                name: 'SDイラスト', 
+                sub: 'Mini Character',
+                price: '5,000', 
+                desc: 'SNSアイコン、LINEスタンプ、グッズ制作に最適なミニキャラクターです。用途に合わせて最適な頭身・絵柄で描き分けます。', 
+                basePrices: [
+                    { label: 'SD全身', price: '¥8,000〜' },
+                    { label: 'SDバストアップ', price: '¥5,000〜' }
+                ],
+                specs: '2000px正方形前後 / 350dpi / 透過PNG / 納期1ヶ月～\n※用途（スタンプ用、アクキー用など）に合わせたサイズ指定も可能です。\n※画像サイズやファイル形式のご指定がある場合は、事前にお申し付けください。',
+                options: [
+                    { label: '新規キャラクターデザイン', price: '＋¥10,000〜' },
+                    { label: '新規衣装デザイン', price: '＋¥8,000〜' },
+                    { label: '表情差分（1種につき）', price: '＋¥500〜' },
+                    { label: '小物・ポーズ差分', price: '＋¥2,000〜' },
+                    { label: '小物背景追加', price: '＋¥7,000〜' },
+                    { label: '背景追加（風景・室内など）', price: '＋¥5,000〜' },
+                    { label: '簡単な背景（単色・パターンなど）', price: '＋¥0' }
+                ],
+                otherOptions: [
+                    { label: 'LINEスタンプ・バッジ用まとめ制作', price: '要相談' },
+                    { label: '顔だけアイコンセット（表情差分5種）', price: '¥8,000' }
+                ],
+                optionNote: '※顔だけアイコン内訳：基本料金¥3,000 ＋ 追加1種につき¥1,000〜',
+                recommends: [
+                    'YouTubeメンバーシップのバッジやスタンプを揃えたい方に',
+                    '配信画面の隅で「ぴょこぴょこ」動く可愛い素材が欲しい方に',
+                    '動画編集でテロップに合わせて表情を細かく変えたい方に'
+                ]
+            },
+            { 
+                id: 'thumb', 
+                name: 'ゲーム実況・動画サムネイル', 
+                sub: 'Thumbnail Design',
+                price: '4,000', 
+                desc: '「ついクリックしたくなる」視聴者目線の画面構成を提供します。これまでの実況動画制作ノウハウを活かした、インパクト重視のレイアウトです。', 
+                basePrices: [
+                    { label: 'サムネイル制作', price: '¥4,000〜' }
+                ],
+                specs: '1280×720〜1920×1080px / 72dpi / PNG / 納期2週間～\n※キャラクターレタッチ、背景合成、タイトルロゴ装飾を含みます。\n※イラスト自体の描き起こしは含まれません。等身/SDメニューと併せてご依頼ください。',
+                options: [
+                    { label: '特急制作（3日以内納品）', price: '＋¥2,000' },
+                    { label: '同一シリーズの差分制作', price: '＋¥2,000〜' },
+                    { label: 'PSDデータ納品', price: '＋¥3,000' }
+                ],
+                recommends: [
+                    'ゲーム実況動画のクリック率（CTR）を改善したい方に',
+                    '自分のキャラクターを動画の世界観に馴染ませて配置したい方に',
+                    '忙しくてサムネイルまで手が回らない実況者様に'
+                ]
+            }
+        ];
+
+        const WORKFLOW_STEPS = [
+            { title: 'ヒアリング・お見積り', desc: '「ご依頼用テンプレート」をご記入の上、ご相談ください。内容を確認し、お見積り金額を提示します。' },
+            { title: 'カラーラフ制作・ご確認', desc: '構成や色味の確認用ラフを制作します。リテイクはこの段階で2回まで無料です。' },
+            { title: 'お支払い', desc: 'ラフの確定後、1週間以内にお支払いをお願いいたします。\n（対応：銀行振込 / PayPal）' },
+            { title: '清書・仕上げ', desc: 'お支払いの確認後、本制作（清書）に入ります。' },
+            { title: '最終確認・納品', desc: '完成品をご確認いただき、不備がなければ納品となります。\n（※清書後の大幅な修正は追加料金が発生します）' }
+        ];
+
+        const SAMPLE_WORKS = [
+            { 
+                id: '1', 
+                title: '全身立ち絵サンプル', 
+                media: [
+                    { type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/800x1200.png?text=SAMPLE_POS_1' },
+                    { type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/800x1200.png?text=SAMPLE_POS_2' }
+                ],
+                category: '等身イラスト', 
+                tags: ['キャラクター全身'],
+                time: '15h', 
+                focus: 'パーツ分けを意識した綺麗な線画と透過の馴染みを重視しました。' 
+            },
+            { 
+                id: '2', 
+                title: 'メイキング映像付き作品', 
+                media: [
+                    { type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/1920x1080.png?text=ILLUSTRATION' },
+                    { type: 'youtube', url: 'https://www.youtube.com/live/S6LBdwFSdOs?si=7AiSJh4EKEJd-xCt' }
+                ],
+                category: '等身イラスト', 
+                tags: ['背景追加', '動画あり'],
+                time: '20h', 
+                focus: '静止画と、制作過程の配信アーカイブをセットで表示する例です。' 
+            },
+            { 
+                id: '3', 
+                title: 'SDキャラ・ショート動画', 
+                media: [
+                    { type: 'youtube', url: 'https://youtube.com/shorts/MZs9geC7Qpo' } 
+                ],
+                category: 'SDイラスト', 
+                tags: ['SD全身', '動画のみ'],
+                time: '5h', 
+                focus: '動くSDキャラクターのサンプルです。配信待機画面などに最適です。' 
+            },
+            { 
+                id: '4', 
+                title: 'ライブ配信アーカイブ', 
+                media: [
+                    { type: 'youtube', url: 'https://youtube.com/live/45xUD6anwQ4' }
+                ],
+                category: 'ゲーム実況・動画サムネイル', 
+                tags: ['サムネイル制作', 'YouTube'],
+                time: '2h', 
+                focus: 'YouTubeのライブ配信アーカイブへのリンクもポートフォリオに追加可能です。' 
+            },
+            { 
+                id: '5', 
+                title: '画像と動画の混在サンプル', 
+                media: [
+                     { type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/1920x1080.png?text=THUMBNAIL' },
+                     { type: 'youtube', url: 'https://youtu.be/MdHzHS4xh6Q' }
+                ],
+                category: 'ゲーム実況・動画サムネイル', 
+                tags: ['サムネイル制作', 'YouTube'],
+                time: '3h', 
+                focus: 'サムネイル画像と、実際の動画をセットで紹介するパターンです。' 
+            }
+        ];
+
+        const NAV_ITEMS = [
+            { id: 'home', icon: 'home' },
+            { id: 'portfolio', icon: 'image' },
+            { id: 'menu', icon: 'menu' },
+            { id: 'profile', icon: 'user' },
+            { id: 'contact', icon: 'send' } 
+        ];
+
+        const TEMPLATE_TEXT = `【ご依頼内容詳細テンプレート】
+①ご依頼内容：
+（全身立ち絵、SDキャラ、サムネイル等）
+②使用用途：
+（YouTube配信、グッズ制作、TRPG等）
+③商用利用の有無：
+（収益化済みの配信、グッズ販売等の有無）
+④画像サイズ / 形式：
+（指定なしの場合：3000px / 350dpi / 透過PNG）
+⑤希望納期：
+（例：〇月〇日まで）
+⑥実績公開の可否：
+（可 / 否）
+
+【キャラクター詳細】
+・性別 / 年齢：
+・髪型 / 色：
+・目の形 / 色：
+・性格 / イメージカラー：
+・衣装 / ポーズ：
+・背景：
+（単色・透過は無料。複雑なものは要相談）
+・その他備考：
+（こだわってほしい点、小物追加など）`;
+
+        // --- Components ---
+        const Bubbles = () => {
+            const bubbles = useMemo(() => Array.from({ length: 12 }).map((_, i) => ({
+                id: i,
+                size: Math.random() * 20 + 5,
+                left: Math.random() * 100,
+                duration: Math.random() * 8 + 8,
+                delay: Math.random() * 5
+            })), []);
+
+            return (
+                <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+                    {bubbles.map(b => (
+                        <div key={b.id} className="bubble" style={{
+                            width: `${b.size}px`, height: `${b.size}px`,
+                            left: `${b.left}%`, bottom: '-30px',
+                            animation: `floatUp ${b.duration}s linear infinite`,
+                            animationDelay: `${b.delay}s`
+                        }}></div>
+                    ))}
+                </div>
+            );
+        };
+
+        const WaveDivider = ({ className = "absolute bottom-0" }) => (
+            <div className={`${className} w-full leading-[0] z-20 overflow-hidden`}>
+                <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-full h-12 md:h-20 drop-shadow-sm">
+                    <path d="M0,0 C300,120 900,120 1200,0 V120 H0 Z" fill="#f0f9ff"></path>
+                </svg>
+            </div>
+        );
+
+        // Helper to convert YouTube URL to embed format
+        // Modified: Robust handling for various YouTube URL formats to prevent Error 153
+        const getYouTubeEmbedUrl = (url) => {
+            if (!url) return '';
+            try {
+                const urlObj = new URL(url);
+                let videoId = '';
+
+                // Case: youtu.be/VIDEO_ID
+                if (urlObj.hostname.includes('youtu.be')) {
+                    videoId = urlObj.pathname.slice(1);
+                } 
+                // Case: youtube.com/...
+                else if (urlObj.hostname.includes('youtube.com')) {
+                    if (urlObj.pathname.startsWith('/shorts/')) {
+                        videoId = urlObj.pathname.split('/shorts/')[1];
+                    } else if (urlObj.pathname.startsWith('/live/')) {
+                        videoId = urlObj.pathname.split('/live/')[1];
+                    } else if (urlObj.pathname.startsWith('/embed/')) {
+                        videoId = urlObj.pathname.split('/embed/')[1];
+                    } else if (urlObj.searchParams.has('v')) {
+                        videoId = urlObj.searchParams.get('v');
+                    }
+                }
+                
+                if (videoId) {
+                    const cleanId = videoId.split(/[?#&/]/)[0];
+                    if (cleanId) {
+                        return `https://www.youtube.com/embed/${cleanId}?playsinline=1&rel=0&modestbranding=1`;
+                    }
+                }
+            } catch (e) {
+                console.warn("URL Parse Error", e);
+            }
+            return url; 
+        };
+
+        // --- Admin Components ---
+        const AdminPage = ({ changePage, db, appId, portfolio, setPortfolio }) => {
+            const [password, setPassword] = useState('');
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [activeTab, setActiveTab] = useState('create');
+            const [editingId, setEditingId] = useState(null);
+            
+            // Modified: Removed 'video' from media options
+            const [itemData, setItemData] = useState({
+                title: '',
+                category: '',
+                tags: [],
+                time: '10h',
+                focus: '',
+                media: [{ type: 'image', url: '' }]
+            });
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (password === 'medaka2026') {
+                    setIsAuthenticated(true);
+                } else {
+                    alert('パスワードが違います');
+                }
+            };
+
+            const resetForm = () => {
+                setItemData({ title: '', category: '', tags: [], time: '10h', focus: '', media: [{ type: 'image', url: '' }] });
+                setEditingId(null);
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!itemData.title || !itemData.category || itemData.media.length === 0 || !itemData.media[0].url) {
+                    alert('必須項目を入力してください');
+                    return;
+                }
+                try {
+                    // Modified: Avoid overwriting createdAt on update
+                    const { createdAt, ...dataToUpdate } = itemData;
+                    dataToUpdate.updatedAt = serverTimestamp();
+                    
+                    if (!editingId) {
+                        // Create
+                        dataToUpdate.createdAt = serverTimestamp();
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'works'), dataToUpdate);
+                        alert('作品を追加しました！');
+                    } else {
+                        // Update
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'works', editingId), dataToUpdate);
+                        alert('作品を更新しました！');
+                    }
+                    resetForm();
+                    setActiveTab('manage');
+                } catch (err) {
+                    console.error("DB Error", err);
+                    alert('エラーが発生しました。');
+                }
+            };
+
+            const handleEditClick = (work) => {
+                setItemData({
+                    title: work.title,
+                    category: work.category,
+                    tags: work.tags || [],
+                    time: work.time,
+                    focus: work.focus,
+                    media: work.media || (work.urls ? work.urls.map(u => ({ type: 'image', url: u })) : [])
+                });
+                setEditingId(work.id);
+                setActiveTab('create');
+                window.scrollTo(0,0);
+            };
+
+            const handleDelete = async (id) => {
+                if (window.confirm('本当に削除しますか？')) {
+                    try {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'works', id));
+                        alert('削除しました');
+                    } catch (e) { console.error('Delete error', e); }
+                }
+            };
+
+            const toggleTag = (tag) => {
+                setItemData(prev => {
+                    const newTags = prev.tags.includes(tag) ? prev.tags.filter(t => t !== tag) : [...prev.tags, tag];
+                    return { ...prev, tags: newTags };
+                });
+            };
+
+            const updateMedia = (index, field, value) => {
+                const newMedia = [...itemData.media];
+                newMedia[index][field] = value;
+                setItemData({ ...itemData, media: newMedia });
+            };
+
+            const addMediaField = () => setItemData({ ...itemData, media: [...itemData.media, { type: 'image', url: '' }] });
+            const removeMediaField = (index) => setItemData({ ...itemData, media: itemData.media.filter((_, i) => i !== index) });
+
+            const currentCat = CATEGORIES.find(c => c.name.replace('■ ', '') === itemData.category);
+            const availableTags = currentCat ? [
+                ...currentCat.basePrices.map(p => p.label),
+                ...currentCat.options.map(p => p.label),
+                ...(currentCat.otherOptions ? currentCat.otherOptions.map(p => p.label) : [])
+            ] : [];
+
+            if (!isAuthenticated) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4">
+                        <form onSubmit={handleLogin} className="glass p-8 rounded-3xl space-y-4 w-full max-w-xs">
+                            <h2 className="text-xl font-bold text-center text-slate-700">管理者ログイン</h2>
+                            <input type="password" placeholder="Password" className="w-full p-3 rounded-xl border border-slate-200" value={password} onChange={e => setPassword(e.target.value)} />
+                            <button type="submit" className="w-full bg-sky-500 text-white p-3 rounded-xl font-bold">Login</button>
+                            <button type="button" onClick={() => changePage('home')} className="w-full text-slate-400 text-xs mt-4">TOPへ戻る</button>
+                        </form>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen p-6 pb-32 max-w-3xl mx-auto fade-in-up">
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-2xl font-bold text-slate-700">管理ページ</h2>
+                        <button onClick={() => changePage('portfolio')} className="text-sm text-sky-500 font-bold">← Galleryへ戻る</button>
+                    </div>
+                    <div className="flex gap-4 mb-8">
+                        <button onClick={() => { setActiveTab('create'); resetForm(); }} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'create' ? 'bg-sky-500 text-white shadow-lg' : 'bg-white text-slate-500'}`}>{editingId ? '作品編集' : '新規投稿'}</button>
+                        <button onClick={() => setActiveTab('manage')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'manage' ? 'bg-sky-500 text-white shadow-lg' : 'bg-white text-slate-500'}`}>作品管理 ({portfolio.length})</button>
+                    </div>
+                    {activeTab === 'create' ? (
+                        <form onSubmit={handleSubmit} className="space-y-6 bg-white/80 p-6 md:p-8 rounded-[2rem] border border-white shadow-lg">
+                            <div className="text-center font-bold text-slate-700 mb-4">{editingId ? '作品情報の編集' : '新しい作品を投稿'}</div>
+                            <div><label className="block text-xs font-bold text-slate-500 mb-2">タイトル</label><input className="w-full p-3 rounded-xl border border-slate-200" value={itemData.title} onChange={e => setItemData({...itemData, title: e.target.value})} required /></div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-2">カテゴリ（必須）</label>
+                                <select className="w-full p-3 rounded-xl border border-slate-200 bg-white" value={itemData.category} onChange={e => setItemData({...itemData, category: e.target.value, tags: []})}>
+                                    <option value="">選択してください</option>
+                                    {CATEGORIES.map(c => <option key={c.id} value={c.name.replace('■ ', '')}>{c.name.replace('■ ', '')}</option>)}
+                                </select>
+                            </div>
+                            {availableTags.length > 0 && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-2">タグ（任意選択）</label>
+                                    <div className="flex flex-wrap gap-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                        {availableTags.map(tag => (
+                                            <button type="button" key={tag} onClick={() => toggleTag(tag)} className={`text-[10px] px-3 py-1 rounded-full border transition-all ${itemData.tags.includes(tag) ? 'bg-sky-500 text-white border-sky-500' : 'bg-white text-slate-500 border-slate-200'}`}>{tag}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-2">制作時間</label>
+                                <select className="w-full p-3 rounded-xl border border-slate-200 bg-white" value={itemData.time} onChange={e => setItemData({...itemData, time: e.target.value})}>
+                                    {[...Array(100).keys()].map(i => <option key={i+1} value={`${i+1}h`}>{i+1}h</option>)}
+                                </select>
+                            </div>
+                            <div><label className="block text-xs font-bold text-slate-500 mb-2">Focus Point</label><textarea className="w-full p-3 rounded-xl border border-slate-200 h-24" value={itemData.focus} onChange={e => setItemData({...itemData, focus: e.target.value})} /></div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-2">メディア (URL)</label>
+                                <div className="space-y-3">
+                                    {itemData.media.map((m, i) => (
+                                        <div key={i} className="flex gap-2">
+                                            {/* Modified: Removed video option */}
+                                            <select className="p-2 rounded-xl border border-slate-200 text-xs bg-white shrink-0" value={m.type} onChange={e => updateMedia(i, 'type', e.target.value)}><option value="image">画像</option><option value="youtube">YouTube</option></select>
+                                            <input className="flex-1 p-2 rounded-xl border border-slate-200 text-xs" placeholder="URL" value={m.url} onChange={e => updateMedia(i, 'url', e.target.value)} />
+                                            {itemData.media.length > 1 && <button type="button" onClick={() => removeMediaField(i)} className="text-slate-400 hover:text-red-400 p-2"><Icon name="x" size={16}/></button>}
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={addMediaField} className="text-xs text-sky-500 font-bold hover:underline bg-sky-50 px-3 py-2 rounded-lg">+ メディア枠を追加</button>
+                                </div>
+                            </div>
+                            <div className="flex gap-4 pt-4">
+                                {editingId && <button type="button" onClick={resetForm} className="flex-1 bg-slate-200 text-slate-600 p-4 rounded-2xl font-bold">キャンセル</button>}
+                                <button type="submit" className="flex-1 bg-slate-800 text-white p-4 rounded-2xl font-bold shadow-lg hover:bg-slate-700 transition-all">{editingId ? '更新する' : '投稿する'}</button>
+                            </div>
+                        </form>
+                    ) : (
+                        <div className="space-y-4">
+                            {portfolio.map(work => (
+                                <div key={work.id} className="bg-white/80 p-4 rounded-2xl border border-slate-100 flex gap-4 items-center shadow-sm">
+                                    <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0"><img src={work.media && work.media[0] ? (work.media[0].type === 'image' ? work.media[0].url : 'https://placehold.jp/150x150.png?text=VIDEO') : (work.urls ? work.urls[0] : '')} className="w-full h-full object-cover" /></div>
+                                    <div className="flex-1 min-w-0"><h4 className="font-bold text-slate-700 truncate">{work.title}</h4><p className="text-xs text-slate-400">{work.category}</p></div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleEditClick(work)} className="p-2 bg-sky-100 text-sky-500 rounded-lg hover:bg-sky-200"><Icon name="edit" size={18}/></button>
+                                        <button onClick={() => handleDelete(work.id)} className="p-2 bg-red-100 text-red-500 rounded-lg hover:bg-red-200"><Icon name="trash" size={18}/></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- PriceAccordion Component ---
+        const PriceAccordion = ({ openMenuId, setOpenMenuId }) => {
+            return (
+                <div className="space-y-4">
+                    {CATEGORIES.map(c => {
+                        const isOpen = openMenuId === c.id;
+                        return (
+                            <div key={c.id} className={`bg-white/80 rounded-2xl border transition-all duration-300 ${isOpen ? 'border-sky-300 shadow-lg ring-4 ring-sky-50/50' : 'border-sky-50 shadow-sm'}`}>
+                                <button 
+                                    className="w-full px-6 py-4 flex justify-between items-center text-slate-700 hover:bg-sky-50/50 transition-colors rounded-2xl outline-none"
+                                    onClick={() => setOpenMenuId(isOpen ? null : c.id)}
+                                >
+                                    <div className="flex flex-col items-start gap-1 flex-1 min-w-0 mr-2 text-left">
+                                        <div className="flex items-center gap-3 font-bold w-full">
+                                            <span className={`w-2 h-2 rounded-full transition-all duration-500 flex-shrink-0 ${isOpen ? 'bg-sky-500 scale-125' : 'bg-slate-200'}`}></span>
+                                            <span className="text-xs sm:text-sm md:text-base whitespace-nowrap overflow-hidden text-ellipsis">{c.name.replace('■ ', '')}</span>
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 pl-5 tracking-wider truncate w-full">{c.sub}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                        <div className="text-right">
+                                            <span className="text-sm font-black text-sky-500 italic">¥{c.price}〜</span>
+                                        </div>
+                                        <div className={`transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isOpen ? '-rotate-90 text-sky-500' : 'text-slate-300'}`}>
+                                            <Icon name="chevronLeft" size={18} />
+                                        </div>
+                                    </div>
+                                </button>
+                                
+                                <div className={`accordion-content ${isOpen ? 'open' : ''}`}>
+                                    <div className="accordion-inner">
+                                        <div className="px-6 pb-8 pt-2 border-t border-slate-100/50 space-y-6">
+                                            <p className="text-xs text-slate-500 font-medium italic border-l-2 border-sky-200 pl-3 leading-relaxed text-left">{c.desc}</p>
+                                            <div>
+                                                <h4 className="text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1"><span className="w-1 h-4 bg-sky-400 rounded-full"></span>基本料金</h4>
+                                                <div className="space-y-1">
+                                                    {c.basePrices.map((bp, i) => (
+                                                        <div key={i} className="flex justify-between items-center text-xs border-b border-slate-100 pb-1 mb-1 last:border-0">
+                                                            <span className="text-slate-600">{bp.label}</span>
+                                                            <span className="font-bold text-sky-600">{bp.price}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="bg-sky-50/50 p-4 rounded-xl text-[10px] border border-sky-100 text-left">
+                                                <p className="font-bold text-sky-600 mb-1 uppercase tracking-widest flex items-center gap-1"><Icon name="info" size={10}/> Basic Specs</p>
+                                                <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{c.specs}</p>
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1"><span className="w-1 h-4 bg-indigo-400 rounded-full"></span>オプション</h4>
+                                                <div className="space-y-1">
+                                                    {c.options.map((opt, i) => (
+                                                        <div key={i} className="flex justify-between items-center bg-white px-3 py-2 rounded-lg text-[10px] border border-slate-100">
+                                                            <span className="text-slate-500 font-bold">{opt.label}</span>
+                                                            <span className="font-black text-indigo-500">{opt.price}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {c.otherOptions && (
+                                                <div>
+                                                    <h4 className="text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1"><span className="w-1 h-4 bg-pink-400 rounded-full"></span>その他オプション</h4>
+                                                    <div className="space-y-1">
+                                                        {c.otherOptions.map((opt, i) => (
+                                                            <div key={i} className="flex justify-between items-center bg-white px-3 py-2 rounded-lg text-[10px] border border-slate-100">
+                                                                <span className="text-slate-500 font-bold">{opt.label}</span>
+                                                                <span className="font-black text-pink-500">{opt.price}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {c.optionNote && (
+                                                        <p className="text-[10px] text-slate-400 mt-2 text-right">{c.optionNote}</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <div className="bg-white border border-slate-100 rounded-xl p-4">
+                                                <h4 className="text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1"><Icon name="star" size={12} className="text-yellow-400"/>こんな方におすすめ</h4>
+                                                <ul className="text-[10px] text-slate-500 list-disc pl-4 space-y-1 text-left">
+                                                    {c.recommends.map((rec, i) => <li key={i}>{rec}</li>)}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        // --- Main App ---
+        const App = () => {
+            const [currentPage, setCurrentPage] = useState('home');
+            const [user, setUser] = useState(null);
+            const [portfolio, setPortfolio] = useState([]);
+            const [openMenuId, setOpenMenuId] = useState(null);
+            const [selectedWork, setSelectedWork] = useState(null);
+            const [workImgIndex, setWorkImgIndex] = useState(0);
+            const [fullScreenUrl, setFullScreenUrl] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [isSent, setIsSent] = useState(false);
+            const [copied, setCopied] = useState(false);
+            const [emailCopied, setEmailCopied] = useState(false);
+
+            const profileIconUrl = "https://i.imgur.com/Z8QWPQm.png";
+
+            // Auth & Data (Standard)
+            useEffect(() => {
+                const initAuth = async () => {
+                    if (!auth) {
+                        setPortfolio(SAMPLE_WORKS);
+                        setLoading(false);
+                        return;
+                    }
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (e) { console.error("Auth Error", e); }
+                };
+                initAuth();
+                if (auth) {
+                    const unsubscribe = onAuthStateChanged(auth, (u) => {
+                        setUser(u);
+                        if (!u) setLoading(false);
+                    });
+                    return () => unsubscribe();
+                }
+            }, []);
+
+            useEffect(() => {
+                if (!user || !db) return;
+                const q = collection(db, 'artifacts', appId, 'public', 'data', 'works');
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    if (items.length > 0) {
+                        setPortfolio(items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+                    } else {
+                        setPortfolio(SAMPLE_WORKS);
+                    }
+                    setLoading(false);
+                }, (err) => {
+                    setPortfolio(SAMPLE_WORKS);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, [user]);
+
+            const changePage = (id) => {
+                setCurrentPage(id);
+                window.scrollTo(0, 0);
+                setOpenMenuId(null);
+                setIsSent(false); 
+                setCopied(false);
+                setEmailCopied(false);
+            };
+
+            const handleContactSubmit = (e) => { e.preventDefault(); setIsSent(true); };
+            
+            const copyText = (text) => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try { document.execCommand('copy'); return true; } 
+                catch (err) { return false; } 
+                finally { document.body.removeChild(textarea); }
+            };
+
+            const handleTemplateCopy = (text) => { if (copyText(text)) { setCopied(true); setTimeout(() => setCopied(false), 2000); } };
+            const handleEmailCopy = () => { if (copyText('medapappa@gmail.com')) { setEmailCopied(true); setTimeout(() => setEmailCopied(false), 3000); } };
+
+            // Swipe Logic for Modal
+            const touchStartX = useRef(0);
+            const touchEndX = useRef(0);
+            
+            const handleTouchStart = (e) => { touchStartX.current = e.changedTouches[0].screenX; };
+            const handleTouchEnd = (e) => {
+                touchEndX.current = e.changedTouches[0].screenX;
+                handleSwipe();
+            };
+            
+            const handleSwipe = () => {
+                if (!selectedWork) return;
+                const mediaLen = selectedWork.media ? selectedWork.media.length : (selectedWork.urls ? selectedWork.urls.length : 0);
+                if (mediaLen <= 1) return;
+                
+                if (touchStartX.current - touchEndX.current > 50) {
+                    // Swipe Left -> Next
+                    setWorkImgIndex((prev) => (prev + 1) % mediaLen);
+                }
+                if (touchStartX.current - touchEndX.current < -50) {
+                    // Swipe Right -> Prev
+                    setWorkImgIndex((prev) => (prev - 1 + mediaLen) % mediaLen);
+                }
+            };
+
+
+            if (loading) return <div className="min-h-screen flex items-center justify-center text-sky-300 font-black animate-pulse bg-[#f0f9ff]">LOADING...</div>;
+
+            // Admin Page Routing
+            if (currentPage === 'admin') return <AdminPage changePage={changePage} db={db} appId={appId} portfolio={portfolio} setPortfolio={setPortfolio} />;
+
+            return (
+                <div className="relative min-h-screen">
+                    <div className="fixed inset-0 bg-gradient-to-b from-sky-200 via-sky-50 to-white -z-10"></div>
+                    <Bubbles />
+
+                    {/* Navigation */}
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm glass rounded-full p-2 flex justify-around items-center transition-all duration-300">
+                        {NAV_ITEMS.map(item => (
+                            <button key={item.id} onClick={() => changePage(item.id)} className={`p-4 rounded-full transition-all duration-300 ${currentPage === item.id ? 'nav-active' : 'text-slate-400 hover:text-sky-400'}`}>
+                                <Icon name={item.icon} size={22} />
+                            </button>
+                        ))}
+                    </nav>
+                    
+                    {/* Admin Link: Fixed at bottom right */}
+                    <div className="fixed bottom-6 right-4 md:right-10 z-[110]">
+                       <button onClick={() => changePage('admin')} className="text-slate-400 hover:text-sky-400 p-3 bg-white/90 rounded-full shadow-md backdrop-blur-sm transition-all border border-slate-100"><Icon name="lock" size={18} /></button>
+                    </div>
+
+                    <main className="min-h-screen relative z-10 pb-32">
+                        {/* --- HOME --- */}
+                        {currentPage === 'home' && (
+                            <div className="fade-in-up">
+                                <section className="relative px-4 overflow-hidden pt-28 md:pt-40 flex flex-col items-center">
+                                    <div className="text-center w-full max-w-4xl relative z-10 mb-12">
+                                        <div className="w-40 h-40 md:w-60 md:h-60 mx-auto mb-10 flex items-center justify-center text-sky-400/80">
+                                            <Icon name="fish" className="w-full h-full" />
+                                        </div>
+                                        <h1 className="text-5xl md:text-7xl font-black text-white text-shadow tracking-tighter mb-4 italic uppercase leading-none">Medaka Village</h1>
+                                        <p className="text-sky-900/40 font-bold tracking-[0.4em] text-[10px] uppercase mb-12 italic">Illustration Portfolio</p>
+                                        <div className="flex flex-row justify-center gap-3 px-2 max-w-[420px] mx-auto">
+                                            <button onClick={() => changePage('portfolio')} className="flex-1 py-5 bg-white text-sky-500 rounded-full font-bold text-[10px] shadow-lg hover:shadow-xl hover:bg-sky-50 active:scale-95 transition-all uppercase tracking-widest whitespace-nowrap">View Gallery</button>
+                                            <button onClick={() => changePage('menu')} className="flex-1 py-5 bg-sky-500 text-white rounded-full font-bold text-[10px] shadow-lg shadow-sky-200/50 hover:bg-sky-400 active:scale-95 transition-all uppercase tracking-widest whitespace-nowrap">Order Menu</button>
+                                        </div>
+                                    </div>
+                                    <WaveDivider className="relative w-full -mb-1" />
+                                </section>
+                                
+                                <section className="pt-12 pb-20 bg-[#f0f9ff] relative z-30">
+                                    <div className="max-w-6xl mx-auto px-4 text-center">
+                                        <h2 className="text-2xl font-black text-sky-900/80 italic uppercase mb-12 underline decoration-sky-200 decoration-4 underline-offset-4">Recent Works</h2>
+                                        
+                                        <div className="grid grid-cols-3 gap-2 md:gap-6 mb-12 justify-center w-full max-w-4xl mx-auto px-2 md:px-4">
+                                            {portfolio.slice(0, 3).map((w) => (
+                                                <div key={w.id} className="aspect-square bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-sky-50 overflow-hidden cursor-pointer relative transition-all hover:scale-[1.02] hover:shadow-md" onClick={() => {setSelectedWork(w); setWorkImgIndex(0);}}>
+                                                    <img src={w.media && w.media[0] ? (w.media[0].type === 'image' ? w.media[0].url : 'https://placehold.jp/150x150.png?text=VIDEO') : (w.urls ? w.urls[0] : '')} className="w-full h-full object-cover" alt={w.title} />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button onClick={() => changePage('portfolio')} className="text-sky-500 font-bold text-xs hover:underline italic underline-offset-4 tracking-widest uppercase mb-24">View Full Gallery →</button>
+
+                                        <h2 className="text-2xl font-black text-sky-900/80 italic uppercase mb-12 underline decoration-sky-200 decoration-4 underline-offset-4">Price List</h2>
+                                        <div className="max-w-xl mx-auto mb-12 text-left">
+                                            <PriceAccordion openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
+                                        </div>
+                                        <button onClick={() => changePage('menu')} className="text-sky-500 font-bold text-xs hover:underline italic underline-offset-4 tracking-widest uppercase">View Full Menu →</button>
+                                    </div>
+                                </section>
+                            </div>
+                        )}
+
+                        {/* --- SUBPAGES --- */}
+                        {currentPage !== 'home' && (
+                            <div className="fade-in-up">
+                                <section className="pt-24 px-6 max-w-6xl mx-auto text-center relative z-30 min-h-[60vh]">
+                                    
+                                    {/* GALLERY */}
+                                    {currentPage === 'portfolio' && (
+                                        <>
+                                            <h2 className="text-4xl font-black text-sky-900/80 mb-16 italic uppercase underline decoration-sky-100 decoration-8 underline-offset-[-2px]">Gallery</h2>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                                                {portfolio.map(w => (
+                                                    <div key={w.id} className="aspect-square bg-white rounded-3xl overflow-hidden shadow-sm border border-sky-50 hover:shadow-xl transition-all cursor-pointer group relative shadow-sky-100/50" onClick={() => {setSelectedWork(w); setWorkImgIndex(0);}}>
+                                                        <img src={w.media && w.media[0] ? (w.media[0].type === 'image' ? w.media[0].url : 'https://placehold.jp/150x150.png?text=VIDEO') : (w.urls ? w.urls[0] : '')} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={w.title} />
+                                                        <div className="absolute inset-0 bg-sky-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-widest backdrop-blur-[2px]">View</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* MENU */}
+                                    {currentPage === 'menu' && (
+                                        <div className="max-w-xl mx-auto pb-24">
+                                            <h2 className="text-4xl font-black text-sky-900/80 mb-16 italic uppercase underline decoration-sky-100 decoration-8 underline-offset-[-2px]">Menu</h2>
+                                            <div className="mb-16">
+                                                <PriceAccordion openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
+                                            </div>
+                                            <div className="mb-20">
+                                                <h3 className="text-xl font-black text-slate-700 mb-8 tracking-widest flex items-center justify-center gap-2">
+                                                    <span className="w-8 h-1 bg-sky-200 rounded-full"></span>
+                                                    WORKFLOW
+                                                    <span className="w-8 h-1 bg-sky-200 rounded-full"></span>
+                                                </h3>
+                                                <div className="space-y-4">
+                                                    {WORKFLOW_STEPS.map((step, i) => (
+                                                        <div key={i} className="relative flex gap-6 text-left group">
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="w-8 h-8 rounded-full bg-sky-500 text-white flex items-center justify-center font-bold text-sm shadow-md z-10">{i+1}</div>
+                                                                {i < WORKFLOW_STEPS.length - 1 && <div className="w-0.5 flex-1 bg-sky-100 my-1"></div>}
+                                                            </div>
+                                                            <div className="flex-1 bg-white/70 border border-slate-100 rounded-2xl p-6 shadow-sm mb-2 group-hover:bg-white transition-colors">
+                                                                <h4 className="font-bold text-slate-800 mb-2 text-sm">{step.title}</h4>
+                                                                <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{step.desc}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-8">
+                                                <div className="bg-white/70 border border-slate-100 rounded-3xl p-8 text-left shadow-sm">
+                                                    <h3 className="text-lg font-black text-slate-700 mb-6 flex items-center gap-2">
+                                                        <span className="text-sky-500"><Icon name="alert" size={20} /></span>
+                                                        ご依頼ガイドライン
+                                                    </h3>
+                                                    <div className="space-y-6 text-xs text-slate-600 font-medium">
+                                                        {/* Guidelines Text */}
+                                                        <div><span className="font-bold inline-block mb-1 text-slate-700">権利について</span><p className="leading-relaxed pl-3 border-l-2 border-slate-200">著作権の譲渡は行っておりません（必要な場合は別途ご相談ください）。<br/>自作発言、二次配布、無断での商用利用、AI学習への使用は一切禁止です。</p></div>
+                                                        <div><span className="font-bold inline-block mb-1 text-slate-700">加工・加筆について</span><p className="leading-relaxed pl-3 border-l-2 border-slate-200">原形を留めない過度な加工はご遠慮ください。<br/>サイズ調整、トリミング、背景の透過処理などの軽微な編集は自由です。</p></div>
+                                                        <div><span className="font-bold inline-block mb-1 text-slate-700">商用利用について</span><p className="leading-relaxed pl-3 border-l-2 border-slate-200">合計金額の <span className="font-bold text-sky-600">＋50%</span> を頂戴いたします。<br/>対象：YouTube収益化済みの配信・動画利用（ショート含む）、グッズ販売、広告利用、その他利益が発生する活動。<br/>使用用途が商用利用にあたるかご不安な場合は、お気軽にご相談ください。</p></div>
+                                                        <div><span className="font-bold inline-block mb-1 text-slate-700">実績公開について</span><p className="leading-relaxed pl-3 border-l-2 border-slate-200">制作物はポートフォリオやSNSに実績として掲載する場合がございます。<br/>非公開をご希望の場合は、<span className="font-bold text-sky-600">追加料金（＋¥5,000）</span>にて承ります。</p></div>
+                                                        <div><span className="font-bold inline-block mb-1 text-slate-700">禁止事項</span><p className="leading-relaxed pl-3 border-l-2 border-slate-200">公序良俗に反する内容、政治・宗教・誹謗中傷に関わる用途での使用。</p></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* PROFILE */}
+                                    {currentPage === 'profile' && (
+                                        <div className="max-w-2xl mx-auto">
+                                            <h2 className="text-4xl font-black text-sky-900/80 mb-12 italic uppercase tracking-tighter">Profile</h2>
+                                            <div className="glass rounded-[3rem] p-8 md:p-12 shadow-sm border border-white space-y-10 text-slate-600 text-sm relative overflow-hidden">
+                                                <div className="flex items-center gap-6 text-left relative z-10">
+                                                    <div className="w-20 h-20 bg-sky-50 rounded-2xl flex items-center justify-center shadow-inner border border-sky-100 rotate-3 overflow-hidden shrink-0">
+                                                        <img src={profileIconUrl} alt="Medaka" className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-2xl font-black text-slate-800 tracking-tight">めだか / Medaka</h3>
+                                                        <p className="text-[10px] text-sky-500 font-bold mt-1 uppercase border-b-2 border-sky-100 pb-1 inline-block tracking-widest">Illustrator</p>
+                                                    </div>
+                                                </div>
+                                                <p className="border-l-4 border-sky-200 pl-6 italic text-slate-500 leading-loose text-left">体温を感じるような色彩で描く、「そこにいる」空気感のあるキャラクターデザインが得意です。<br/>お絵描きとゲームと実況が好きです。ジャック・オ・蘭たんさんが生きがい。</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="bg-sky-50/50 p-6 rounded-[2rem] border border-sky-100 text-center"><h4 className="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-2">Main Tools</h4><p className="text-xs font-bold text-sky-800 leading-relaxed">ClipStudio EX<br/>Photoshop<br/>Illustrator</p></div>
+                                                    <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 text-center"><h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Studying</h4><p className="text-xs font-bold text-indigo-800 leading-relaxed">Live2D<br/>Webtoon<br/>Manga</p></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* CONTACT */}
+                                    {currentPage === 'contact' && (
+                                        <div className="max-w-xl mx-auto">
+                                            <h2 className="text-4xl font-black text-sky-900/80 mb-12 italic uppercase tracking-tighter">Contact</h2>
+                                            <div className="glass rounded-[3rem] p-8 md:p-14 shadow-sm border border-white relative overflow-hidden text-center space-y-12">
+                                                <div className="space-y-4">
+                                                    <p className="text-sm text-slate-500 leading-relaxed font-medium">ご依頼、お見積りのご相談は下記よりお気軽にご連絡ください。</p>
+                                                    <div className="inline-block bg-sky-50 px-6 py-2 rounded-full border border-sky-100">
+                                                        <p className="text-xs font-bold text-slate-600">現在、<br class="block md:hidden"/><span className="text-sky-500 text-sm">2026年3月頃</span><br class="block md:hidden"/>着手の案件を受付中です。</p>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-4 w-full max-w-sm mx-auto">
+                                                    <button onClick={handleEmailCopy} className="group block w-full bg-white border border-sky-100 rounded-3xl p-1 shadow-sm hover:shadow-lg hover:border-sky-300 transition-all duration-300 active:scale-95">
+                                                        <div className="flex items-center gap-4 bg-sky-50/50 rounded-[1.2rem] p-4 group-hover:bg-sky-500 group-hover:text-white transition-colors relative overflow-hidden">
+                                                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-sky-500 shadow-sm shrink-0"><Icon name="mail" size={24} /></div>
+                                                            <div className="text-left flex-1 min-w-0 flex flex-col justify-center">
+                                                                <p className="text-sm font-bold text-slate-700 group-hover:text-white">メールで相談する</p>
+                                                                <p className="text-[10px] text-slate-400 group-hover:text-sky-100">タップしてアドレスをコピー</p>
+                                                            </div>
+                                                            <Icon name="copy" size={16} className="text-sky-300 group-hover:text-white mr-2" />
+                                                        </div>
+                                                    </button>
+                                                    {emailCopied && <div className="text-sky-500 text-xs font-bold animate-pulse fade-in-up">メールアドレスをコピーしました。</div>}
+                                                    <a href="https://twitter.com/medapappa" target="_blank" rel="noopener noreferrer" className="group block w-full bg-white border border-slate-100 rounded-3xl p-1 shadow-sm hover:shadow-lg hover:border-slate-300 transition-all duration-300 active:scale-95">
+                                                        <div className="flex items-center gap-4 bg-slate-50/50 rounded-[1.2rem] p-4 group-hover:bg-slate-500 group-hover:text-white transition-colors">
+                                                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-700 shadow-sm shrink-0"><Icon name="twitter" size={24} /></div>
+                                                            <div className="text-left flex-1 min-w-0 flex items-center"><p className="text-sm font-bold text-slate-700 group-hover:text-white">Xで相談する</p></div>
+                                                            <Icon name="chevronLeft" size={16} className="rotate-180 text-slate-300 group-hover:text-white mr-2" />
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                                <div className="mt-12 pt-8 border-t border-slate-100 text-left">
+                                                    <h3 className="text-sm font-black text-slate-700 mb-4 flex items-center gap-2 justify-center md:justify-start"><Icon name="mail" size={16} className="text-sky-500"/> お申し込み用テンプレート</h3>
+                                                    <div className="bg-white rounded-xl border border-slate-100 p-4 text-xs text-slate-600 font-mono leading-loose relative shadow-inner h-48 overflow-y-auto custom-scrollbar">
+                                                        <pre className="whitespace-pre-wrap">{TEMPLATE_TEXT}</pre>
+                                                        <button onClick={() => handleTemplateCopy(TEMPLATE_TEXT)} className={`absolute top-2 right-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${copied ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-sky-100 hover:text-sky-600'}`}>{copied ? <>Copied! <Icon name="check" size={12} /></> : <>Copy <Icon name="copy" size={12} /></>}</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </section>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Modal */}
+                    {selectedWork && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 transition-all duration-300" onClick={() => setSelectedWork(null)}>
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-md"></div>
+                            {/* Modified: Added relative container for sticky button logic */}
+                            <div className="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl overflow-y-auto max-h-[90vh] relative z-10 animate-fade-up border border-white" 
+                                onTouchStart={handleTouchStart} 
+                                onTouchEnd={handleTouchEnd}
+                                onClick={e => e.stopPropagation()}
+                            >
+                                {/* Modified: Sticky Close Button */}
+                                <div className="sticky top-0 right-0 z-50 flex justify-end p-4 pb-0 pointer-events-none">
+                                    <button onClick={() => setSelectedWork(null)} className="pointer-events-auto w-10 h-10 bg-slate-100/90 backdrop-blur hover:bg-slate-200 text-slate-400 hover:text-slate-800 rounded-full flex items-center justify-center transition-colors shadow-sm">
+                                        <Icon name="x" size={20} />
+                                    </button>
+                                </div>
+                                
+                                <div className="flex flex-col md:flex-row gap-8 md:gap-12 p-6 md:p-10 pt-0 -mt-2">
+                                    <div className="flex-1 space-y-4">
+                                        <div className="relative w-full rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shadow-md group">
+                                            {selectedWork.media && selectedWork.media[workImgIndex] ? (
+                                                selectedWork.media[workImgIndex].type === 'video' ? (
+                                                    <video src={selectedWork.media[workImgIndex].url} controls className="w-full h-auto" />
+                                                ) : selectedWork.media[workImgIndex].type === 'youtube' ? (
+                                                    <iframe src={getYouTubeEmbedUrl(selectedWork.media[workImgIndex].url)} className="w-full aspect-video" frameBorder="0" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+                                                ) : (
+                                                    <img src={selectedWork.media[workImgIndex].url} className="w-full h-auto cursor-zoom-in" onClick={() => setFullScreenUrl(selectedWork.media[workImgIndex].url)} alt={selectedWork.title} />
+                                                )
+                                            ) : (
+                                                <img src={selectedWork.urls ? selectedWork.urls[workImgIndex] : ''} className="w-full h-auto cursor-zoom-in" onClick={() => setFullScreenUrl(selectedWork.urls[workImgIndex])} alt={selectedWork.title} />
+                                            )}
+                                            
+                                            {/* PC Navigation Buttons (Restored with higher z-index and visibility) */}
+                                            {((selectedWork.media && selectedWork.media.length > 1) || (selectedWork.urls && selectedWork.urls.length > 1)) && (
+                                                <>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); setWorkImgIndex((prev) => (prev - 1 + (selectedWork.media || selectedWork.urls).length) % (selectedWork.media || selectedWork.urls).length); }} 
+                                                        className="hidden md:flex absolute top-1/2 left-4 -translate-y-1/2 w-12 h-12 bg-white/80 hover:bg-white text-slate-700 rounded-full items-center justify-center transition-all shadow-lg z-50"
+                                                    >
+                                                        <Icon name="chevronLeft" size={28}/>
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); setWorkImgIndex((prev) => (prev + 1) % (selectedWork.media || selectedWork.urls).length); }} 
+                                                        className="hidden md:flex absolute top-1/2 right-4 -translate-y-1/2 w-12 h-12 bg-white/80 hover:bg-white text-slate-700 rounded-full items-center justify-center transition-all shadow-lg z-50"
+                                                    >
+                                                        <Icon name="chevronLeft" size={28} className="rotate-180"/>
+                                                    </button>
+                                                </>
+                                            )}
+
+                                            {((selectedWork.media && selectedWork.media.length > 1) || (selectedWork.urls && selectedWork.urls.length > 1)) && (
+                                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                                                    {(selectedWork.media || selectedWork.urls).map((_, i) => (
+                                                        <button key={i} onClick={(e) => { e.stopPropagation(); setWorkImgIndex(i); }} className={`w-2 h-2 rounded-full transition-all shadow-sm ${workImgIndex === i ? 'bg-sky-500 w-4' : 'bg-white/80 hover:bg-white'}`} />
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="w-full md:w-[320px] text-left space-y-8">
+                                        <div>
+                                            <h3 className="text-2xl font-black text-slate-800 mb-2 leading-tight">{selectedWork.title}</h3>
+                                            <div className="flex flex-wrap gap-2">
+                                                <span className="text-[10px] text-white font-bold uppercase tracking-widest bg-sky-400 px-3 py-1 rounded-full">{selectedWork.category && selectedWork.category.replace('■ ', '')}</span>
+                                                {selectedWork.tags && selectedWork.tags.map((tag, i) => (
+                                                    <span key={i} className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-1 rounded-full border border-slate-200">{tag}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div className="bg-slate-50 p-4 rounded-xl flex items-center justify-between border border-slate-100">
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Icon name="clock" size={14}/> Time</span>
+                                                <span className="text-sm font-black text-slate-700">{selectedWork.time}</span>
+                                            </div>
+                                            <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 relative overflow-hidden">
+                                                <h4 className="text-[10px] font-black text-indigo-400 uppercase mb-3 tracking-widest">Focus Point</h4>
+                                                <p className="text-indigo-900 font-medium text-xs leading-loose whitespace-pre-wrap">{selectedWork.focus}</p>
+                                            </div>
+                                        </div>
+                                        {/* Modified: Contact button color */}
+                                        <button onClick={() => {setSelectedWork(null); changePage('contact');}} className="w-full bg-sky-500 text-white py-5 rounded-2xl font-bold text-xs shadow-xl shadow-sky-200/50 hover:bg-sky-400 transition-all flex items-center justify-center gap-3 uppercase tracking-widest active:scale-95">
+                                            <Icon name="send" size={16} /> Contact
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Full Screen */}
+                    {fullScreenUrl && (
+                        <div className="fixed inset-0 z-[300] bg-white/95 backdrop-blur-xl flex items-center justify-center p-4 cursor-zoom-out animate-fade-in" onClick={() => setFullScreenUrl(null)}>
+                            <img src={fullScreenUrl} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-lg" />
+                            <button className="absolute top-6 right-6 p-4 bg-slate-100 rounded-full hover:bg-slate-200"><Icon name="x" size={24} /></button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
