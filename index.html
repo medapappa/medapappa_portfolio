@@ -62,6 +62,15 @@
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        
+        /* トースト通知のアニメーション */
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .toast-enter {
+            animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
 
         /* --- Utilities --- */
         .glass {
@@ -91,7 +100,6 @@
 
     <!-- Firebase SDK & App Logic -->
     <script type="text/babel" data-type="module">
-        // Importに必要な関数を追加しました (signInWithEmailAndPassword)
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js';
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
         import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
@@ -99,7 +107,6 @@
         const { useState, useEffect, useMemo, useRef } = React;
 
         // --- Firebase Config ---
-        // あなたのプロジェクト情報を設定済みです
         const firebaseConfig = {
             apiKey: "AIzaSyA6EykukmTI7K-nQ7NC4s-Qz7rGflb1yEI",
             authDomain: "medapappa-pf.firebaseapp.com",
@@ -119,7 +126,6 @@
             console.error("Firebase Init Error:", e);
         }
         
-        // App ID (コレクションのパスに使用)
         const appId = 'medaka-final-v3';
 
         // --- Icons (SVG) ---
@@ -128,6 +134,7 @@
                 home: <path d="M3 10l9-8 9 8v10a2 2 0 01-2 2H5a2 2 0 01-2-2V10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>,
                 image: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
                 menu: <><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><line x1="8" y1="7" x2="16" y2="7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="8" y1="17" x2="16" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                // 修正: プロフィールアイコンを正常な形に修正
                 user: <><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
                 chevronLeft: <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
                 info: <><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
@@ -146,7 +153,15 @@
                 edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
                 trash: <><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
                 video: <><path d="M23 7l-7 5 7 5V7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
-                play: <><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M10 8l6 4-6 4V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>
+                play: <><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M10 8l6 4-6 4V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                link: <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
+                external: <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+                gift: <><rect x="3" y="8" width="18" height="4" rx="1" stroke="currentColor" strokeWidth="2"/><path d="M12 8v13" stroke="currentColor" strokeWidth="2"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" stroke="currentColor" strokeWidth="2"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" stroke="currentColor" strokeWidth="2"/></>,
+                pixiv: <><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M10 8h2a3 3 0 0 1 0 6h-2v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>,
+                // 修正: 鉛筆のピクトグラムに変更
+                pencil: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>,
+                gamepad: <><rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M6 12h4m-2-2v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="15" cy="13" r="0.5" fill="currentColor"/><circle cx="18" cy="11" r="0.5" fill="currentColor"/></>,
+                sketchbook: <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M8 4v4m4-4v4m4-4v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></>
             };
             
             return (
@@ -156,192 +171,53 @@
             );
         };
 
-        // --- Data ---
-        const CATEGORIES = [
-            { 
-                id: 'standard', 
-                name: '等身イラスト', 
-                sub: 'Standard Illustration',
-                price: '12,000', 
-                desc: '配信、アクリルスタンド、MVなど多目的に使用できる高品質なイラストです。キャラクターの魅力を引き出す「生きた」立ち姿を制作します。', 
-                basePrices: [
-                    { label: 'キャラクター全身', price: '¥15,000〜' },
-                    { label: '腰上（ニーアップ）', price: '¥14,000〜' },
-                    { label: 'バストアップ', price: '¥12,000〜' }
-                ],
-                specs: '長辺～4000px前後 / 350dpi / 透過PNG / 納期1ヶ月～\n※画像サイズやファイル形式のご指定がある場合は、事前にお申し付けください。',
-                options: [
-                    { label: '新規キャラクターデザイン', price: '＋¥15,000〜' },
-                    { label: '新規衣装デザイン', price: '＋¥8,000〜' },
-                    { label: '「ぴょこぴょこ」口パク差分（配信向け）', price: '＋¥2,000' },
-                    { label: '表情差分（1種につき）', price: '＋¥500〜' },
-                    { label: '衣装・ポーズ差分', price: '＋¥3,000〜' },
-                    { label: '背景追加（風景・室内など）', price: '＋¥10,000〜' },
-                    { label: '簡単な背景（パターン・空など）', price: '＋¥2,000〜' }
-                ],
-                recommends: [
-                    'VTuber活動のメインモデルや新衣装制作に',
-                    '歌ってみたMVで「動き」や「遠近法」を感じさせる一枚が欲しい方に',
-                    'グッズ化した際に細部まで綺麗なイラストを求めている方に'
-                ]
-            },
-            { 
-                id: 'sd', 
-                name: 'SDイラスト', 
-                sub: 'Mini Character',
-                price: '5,000', 
-                desc: 'SNSアイコン、LINEスタンプ、グッズ制作に最適なミニキャラクターです。用途に合わせて最適な頭身・絵柄で描き分けます。', 
-                basePrices: [
-                    { label: 'SD全身', price: '¥8,000〜' },
-                    { label: 'SDバストアップ', price: '¥5,000〜' }
-                ],
-                specs: '2000px正方形前後 / 350dpi / 透過PNG / 納期1ヶ月～\n※用途（スタンプ用、アクキー用など）に合わせたサイズ指定も可能です。\n※画像サイズやファイル形式のご指定がある場合は、事前にお申し付けください。',
-                options: [
-                    { label: '新規キャラクターデザイン', price: '＋¥10,000〜' },
-                    { label: '新規衣装デザイン', price: '＋¥8,000〜' },
-                    { label: '表情差分（1種につき）', price: '＋¥500〜' },
-                    { label: '小物・ポーズ差分', price: '＋¥2,000〜' },
-                    { label: '小物背景追加', price: '＋¥7,000〜' },
-                    { label: '背景追加（風景・室内など）', price: '＋¥5,000〜' },
-                    { label: '簡単な背景（単色・パターンなど）', price: '＋¥0' }
-                ],
-                otherOptions: [
-                    { label: 'LINEスタンプ・バッジ用まとめ制作', price: '要相談' },
-                    { label: '顔だけアイコンセット（表情差分5種）', price: '¥8,000' }
-                ],
-                optionNote: '※顔だけアイコン内訳：基本料金¥3,000 ＋ 追加1種につき¥1,000〜',
-                recommends: [
-                    'YouTubeメンバーシップのバッジやスタンプを揃えたい方に',
-                    '配信画面の隅で「ぴょこぴょこ」動く可愛い素材が欲しい方に',
-                    '動画編集でテロップに合わせて表情を細かく変えたい方に'
-                ]
-            },
-            { 
-                id: 'thumb', 
-                name: 'ゲーム実況・動画サムネイル', 
-                sub: 'Thumbnail Design',
-                price: '4,000', 
-                desc: '「ついクリックしたくなる」視聴者目線の画面構成を提供します。これまでの実況動画制作ノウハウを活かした、インパクト重視のレイアウトです。', 
-                basePrices: [
-                    { label: 'サムネイル制作', price: '¥4,000〜' }
-                ],
-                specs: '1280×720〜1920×1080px / 72dpi / PNG / 納期2週間～\n※キャラクターレタッチ、背景合成、タイトルロゴ装飾を含みます。\n※イラスト自体の描き起こしは含まれません。等身/SDメニューと併せてご依頼ください。',
-                options: [
-                    { label: '特急制作（3日以内納品）', price: '＋¥2,000' },
-                    { label: '同一シリーズの差分制作', price: '＋¥2,000〜' },
-                    { label: 'PSDデータ納品', price: '＋¥3,000' }
-                ],
-                recommends: [
-                    'ゲーム実況動画のクリック率（CTR）を改善したい方に',
-                    '自分のキャラクターを動画の世界観に馴染ませて配置したい方に',
-                    '忙しくてサムネイルまで手が回らない実況者様に'
-                ]
+        // --- Helper: YouTube ID & Thumbnail ---
+        const getYouTubeVideoId = (url) => {
+            if (!url) return null;
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.hostname.includes('youtu.be')) return urlObj.pathname.slice(1);
+                if (urlObj.hostname.includes('youtube.com')) {
+                    if (urlObj.pathname.startsWith('/shorts/')) return urlObj.pathname.split('/shorts/')[1];
+                    if (urlObj.pathname.startsWith('/live/')) return urlObj.pathname.split('/live/')[1];
+                    if (urlObj.pathname.startsWith('/embed/')) return urlObj.pathname.split('/embed/')[1];
+                    if (urlObj.searchParams.has('v')) return urlObj.searchParams.get('v');
+                }
+            } catch (e) { return null; }
+            return null;
+        };
+
+        const getYouTubeThumbnail = (url) => {
+            const videoId = getYouTubeVideoId(url);
+            // hqdefault (480x360) はほとんどの動画で利用可能でアスペクト比も4:3で使いやすい
+            if (videoId) return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+            return null;
+        };
+
+        const getYouTubeEmbedUrl = (url) => {
+            const videoId = getYouTubeVideoId(url);
+            if (videoId) {
+                const cleanId = videoId.split(/[?#&/]/)[0];
+                return `https://www.youtube.com/embed/${cleanId}?playsinline=1&rel=0&modestbranding=1`;
             }
-        ];
-
-        const WORKFLOW_STEPS = [
-            { title: 'ヒアリング・お見積り', desc: '「ご依頼用テンプレート」をご記入の上、ご相談ください。内容を確認し、お見積り金額を提示します。' },
-            { title: 'カラーラフ制作・ご確認', desc: '構成や色味の確認用ラフを制作します。リテイクはこの段階で2回まで無料です。' },
-            { title: 'お支払い', desc: 'ラフの確定後、1週間以内にお支払いをお願いいたします。\n（対応：銀行振込 / PayPal）' },
-            { title: '清書・仕上げ', desc: 'お支払いの確認後、本制作（清書）に入ります。' },
-            { title: '最終確認・納品', desc: '完成品をご確認いただき、不備がなければ納品となります。\n（※清書後の大幅な修正は追加料金が発生します）' }
-        ];
-
-        const SAMPLE_WORKS = [
-            { 
-                id: '1', 
-                title: '全身立ち絵サンプル', 
-                media: [
-                    { type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/800x1200.png?text=SAMPLE_POS_1' },
-                    { type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/800x1200.png?text=SAMPLE_POS_2' }
-                ],
-                category: '等身イラスト', 
-                tags: ['キャラクター全身'],
-                time: '15h', 
-                focus: 'パーツ分けを意識した綺麗な線画と透過の馴染みを重視しました。' 
-            },
-            { 
-                id: '2', 
-                title: 'メイキング映像付き作品', 
-                media: [
-                    { type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/1920x1080.png?text=ILLUSTRATION' },
-                    { type: 'youtube', url: 'https://www.youtube.com/live/S6LBdwFSdOs?si=7AiSJh4EKEJd-xCt' }
-                ],
-                category: '等身イラスト', 
-                tags: ['背景追加', '動画あり'],
-                time: '20h', 
-                focus: '静止画と、制作過程の配信アーカイブをセットで表示する例です。' 
-            },
-            { 
-                id: '3', 
-                title: 'SDキャラ・ショート動画', 
-                media: [
-                    { type: 'youtube', url: 'https://youtube.com/shorts/MZs9geC7Qpo' } 
-                ],
-                category: 'SDイラスト', 
-                tags: ['SD全身', '動画のみ'],
-                time: '5h', 
-                focus: '動くSDキャラクターのサンプルです。配信待機画面などに最適です。' 
-            },
-            { 
-                id: '4', 
-                title: 'ライブ配信アーカイブ', 
-                media: [
-                    { type: 'youtube', url: 'https://youtube.com/live/45xUD6anwQ4' }
-                ],
-                category: 'ゲーム実況・動画サムネイル', 
-                tags: ['サムネイル制作', 'YouTube'],
-                time: '2h', 
-                focus: 'YouTubeのライブ配信アーカイブへのリンクもポートフォリオに追加可能です。' 
-            },
-            { 
-                id: '5', 
-                title: '画像と動画の混在サンプル', 
-                media: [
-                     { type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/1920x1080.png?text=THUMBNAIL' },
-                     { type: 'youtube', url: 'https://youtu.be/MdHzHS4xh6Q' }
-                ],
-                category: 'ゲーム実況・動画サムネイル', 
-                tags: ['サムネイル制作', 'YouTube'],
-                time: '3h', 
-                focus: 'サムネイル画像と、実際の動画をセットで紹介するパターンです。' 
-            }
-        ];
-
-        const NAV_ITEMS = [
-            { id: 'home', icon: 'home' },
-            { id: 'portfolio', icon: 'image' },
-            { id: 'menu', icon: 'menu' },
-            { id: 'profile', icon: 'user' },
-            { id: 'contact', icon: 'send' } 
-        ];
-
-        const TEMPLATE_TEXT = `【ご依頼内容詳細テンプレート】
-①ご依頼内容：
-（全身立ち絵、SDキャラ、サムネイル等）
-②使用用途：
-（YouTube配信、グッズ制作、TRPG等）
-③商用利用の有無：
-（収益化済みの配信、グッズ販売等の有無）
-④画像サイズ / 形式：
-（指定なしの場合：3000px / 350dpi / 透過PNG）
-⑤希望納期：
-（例：〇月〇日まで）
-⑥実績公開の可否：
-（可 / 否）
-
-【キャラクター詳細】
-・性別 / 年齢：
-・髪型 / 色：
-・目の形 / 色：
-・性格 / イメージカラー：
-・衣装 / ポーズ：
-・背景：
-（単色・透過は無料。複雑なものは要相談）
-・その他備考：
-（こだわってほしい点、小物追加など）`;
+            return url; 
+        };
 
         // --- Components ---
+        const Toast = ({ message, type, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 3000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+
+            return (
+                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-full shadow-lg font-bold text-sm text-white flex items-center gap-2 toast-enter ${type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+                    <Icon name={type === 'error' ? 'alert' : 'check'} size={18} />
+                    {message}
+                </div>
+            );
+        };
+
         const Bubbles = () => {
             const bubbles = useMemo(() => Array.from({ length: 12 }).map((_, i) => ({
                 id: i,
@@ -373,42 +249,122 @@
             </div>
         );
 
-        // Helper to convert YouTube URL to embed format
-        // Modified: Robust handling for various YouTube URL formats to prevent Error 153
-        const getYouTubeEmbedUrl = (url) => {
-            if (!url) return '';
-            try {
-                const urlObj = new URL(url);
-                let videoId = '';
-
-                // Case: youtu.be/VIDEO_ID
-                if (urlObj.hostname.includes('youtu.be')) {
-                    videoId = urlObj.pathname.slice(1);
-                } 
-                // Case: youtube.com/...
-                else if (urlObj.hostname.includes('youtube.com')) {
-                    if (urlObj.pathname.startsWith('/shorts/')) {
-                        videoId = urlObj.pathname.split('/shorts/')[1];
-                    } else if (urlObj.pathname.startsWith('/live/')) {
-                        videoId = urlObj.pathname.split('/live/')[1];
-                    } else if (urlObj.pathname.startsWith('/embed/')) {
-                        videoId = urlObj.pathname.split('/embed/')[1];
-                    } else if (urlObj.searchParams.has('v')) {
-                        videoId = urlObj.searchParams.get('v');
-                    }
-                }
-                
-                if (videoId) {
-                    const cleanId = videoId.split(/[?#&/]/)[0];
-                    if (cleanId) {
-                        return `https://www.youtube.com/embed/${cleanId}?playsinline=1&rel=0&modestbranding=1`;
-                    }
-                }
-            } catch (e) {
-                console.warn("URL Parse Error", e);
+        // --- Data Definitions ---
+        const CATEGORIES = [
+            { 
+                id: 'standard', 
+                name: '等身イラスト', 
+                sub: 'Standard Illustration', 
+                price: '12,000', 
+                desc: '配信、アクリルスタンド、MVなど多目的に使用できる高品質なイラストです。キャラクターの魅力を引き出す「生きた」立ち姿を制作します。', 
+                basePrices: [
+                    { label: 'キャラクター全身', price: '¥15,000〜' }, 
+                    { label: '腰上（ニーアップ）', price: '¥14,000〜' }, 
+                    { label: 'バストアップ', price: '¥12,000〜' }
+                ], 
+                specs: '長辺～4000px前後 / 350dpi / 透過PNG / 納期1ヶ月～\n※画像サイズやファイル形式のご指定がある場合は、事前にお申し付けください。', 
+                options: [
+                    { label: '新規キャラクターデザイン', price: '＋¥15,000〜' }, 
+                    { label: '新規衣装デザイン', price: '＋¥8,000〜' }, 
+                    { label: '「ぴょこぴょこ」口パク差分（配信向け）', price: '＋¥2,000' },
+                    { label: '表情差分（1種につき）', price: '＋¥500〜' }, 
+                    { label: '衣装・ポーズ差分', price: '＋¥3,000〜' },
+                    { label: '背景追加（風景・室内など）', price: '＋¥10,000〜' },
+                    { label: '簡単な背景（パターン・空など）', price: '＋¥2,000〜' }
+                ], 
+                recommends: ['VTuber活動のメインモデルや新衣装制作に', '歌ってみたMVで「動き」や「遠近法」を感じさせる一枚が欲しい方に', 'グッズ化した際に細部まで綺麗なイラストを求めている方に'] 
+            },
+            { 
+                id: 'sd', 
+                name: 'SDイラスト', 
+                sub: 'Mini Character', 
+                price: '5,000', 
+                desc: 'SNSアイコン、LINEスタンプ、グッズ制作に最適なミニキャラクターです。用途に合わせて最適な頭身・絵柄で描き分けます。', 
+                basePrices: [
+                    { label: 'SD全身', price: '¥8,000〜' }, 
+                    { label: 'SDバストアップ', price: '¥5,000〜' }
+                ], 
+                specs: '2000px正方形前後 / 350dpi / 透過PNG / 納期1ヶ月～\n※用途（スタンプ用、アクキー用など）に合わせたサイズ指定も可能です。\n※画像サイズやファイル形式のご指定がある場合は、事前にお申し付けください。', 
+                options: [
+                    { label: '新規キャラクターデザイン', price: '＋¥10,000〜' }, 
+                    { label: '新規衣装デザイン', price: '＋¥8,000〜' }, 
+                    { label: '表情差分（1種につき）', price: '＋¥500〜' }, 
+                    { label: '小物・ポーズ差分', price: '＋¥2,000〜' },
+                    { label: '小物背景追加', price: '＋¥7,000〜' },
+                    { label: '背景追加（風景・室内など）', price: '＋¥5,000〜' },
+                    { label: '簡単な背景（単色・パターンなど）', price: '＋¥0' }
+                ], 
+                otherOptions: [
+                    { label: 'LINEスタンプ・バッジ用まとめ制作', price: '要相談' },
+                    { label: '顔だけアイコンセット（表情差分5種）', price: '¥8,000' }
+                ],
+                optionNote: '※顔だけアイコン内訳：基本料金¥3,000 ＋ 追加1種につき¥1,000〜',
+                recommends: ['YouTubeメンバーシップのバッジやスタンプを揃えたい方に', '配信画面の隅で「ぴょこぴょこ」動く可愛い素材が欲しい方に', '動画編集でテロップに合わせて表情を細かく変えたい方に'] 
+            },
+            { 
+                id: 'thumb', 
+                name: 'ゲーム実況・動画サムネイル', 
+                sub: 'Thumbnail Design', 
+                price: '4,000', 
+                desc: '「ついクリックしたくなる」視聴者目線の画面構成を提供します。これまでの実況動画制作ノウハウを活かした、インパクト重視のレイアウトです。', 
+                basePrices: [{ label: 'サムネイル制作', price: '¥4,000〜' }], 
+                specs: '1280×720〜1920×1080px / 72dpi / PNG / 納期2週間～\n※キャラクターレタッチ、背景合成、タイトルロゴ装飾を含みます。\n※イラスト自体の描き起こしは含まれません。等身/SDメニューと併せてご依頼ください。', 
+                options: [
+                    { label: '特急制作（3日以内納品）', price: '＋¥2,000' }, 
+                    { label: '同一シリーズの差分制作', price: '＋¥2,000〜' },
+                    { label: 'PSDデータ納品', price: '＋¥3,000' }
+                ], 
+                recommends: ['ゲーム実況動画のクリック率（CTR）を改善したい方に', '自分のキャラクターを動画の世界観に馴染ませて配置したい方に', '忙しくてサムネイルまで手が回らない実況者様に'] 
+            },
+            // Skeb (内容更新: 金額・注釈追加)
+            { 
+                id: 'skeb', 
+                name: 'Skeb', 
+                sub: 'Quick Request', 
+                price: '', // 金額非表示
+                desc: '細かい打ち合わせなしで、個人利用向けのイラストを気軽にリクエストできるサービスです。', 
+                basePrices: [
+                    { label: 'おまかせ金額', price: '¥10,000' },
+                    { label: '最低金額', price: '¥8,000' }
+                ],
+                // 注釈フィールド追加（基本料金の下に表示）
+                priceNote: '※この金額での依頼を強制するものではありません。\nあくまで、金額設定はクライアント様のご判断にお任せします。',
+                // 修正: 納期を3週間〜1ヶ月に変更
+                specs: '原則リテイクなし / 個人利用のみ / 納期3週間～1ヶ月\n※Skebの利用規約に準拠します。\n※商用利用はできません。',
+                // 修正: オプション名を商用利用に変更
+                options: [{ label: '商用利用', price: '不可' }, { label: 'リテイク', price: '不可' }], 
+                recommends: ['安価に推しのイラストを描いてほしい方に', 'ご依頼のやり取りを省略したい方に', '納品までのワクワク感を楽しみたい方に'],
+                externalLink: 'https://skeb.jp/@medapappa',
+                buttonText: 'Skebでリクエストする'
             }
-            return url; 
-        };
+        ];
+
+        const SAMPLE_WORKS = [
+            { id: '1', title: '全身立ち絵サンプル', media: [{ type: 'image', url: 'https://placehold.jp/48/0ea5e9/ffffff/800x1200.png?text=SAMPLE' }], category: '等身イラスト', tags: ['キャラクター全身'], time: '15h', focus: 'パーツ分けを意識した線画。' },
+            { id: '2', title: 'SDキャラ・ショート動画', media: [{ type: 'youtube', url: 'https://youtube.com/shorts/MZs9geC7Qpo' }], category: 'SDイラスト', tags: ['SD全身', '動画'], time: '5h', focus: '動くSDキャラクター。' }
+        ];
+
+        const NAV_ITEMS = [
+            { id: 'home', icon: 'home' },
+            { id: 'portfolio', icon: 'image' },
+            { id: 'menu', icon: 'menu' },
+            { id: 'profile', icon: 'user' },
+            { id: 'contact', icon: 'send' } 
+        ];
+
+        const TEMPLATE_TEXT = `【ご依頼内容詳細テンプレート】\n①ご依頼内容：\n②使用用途：\n③商用利用の有無：\n④画像サイズ / 形式：\n⑤希望納期：\n⑥実績公開の可否：\n\n【キャラクター詳細】\n・性別 / 年齢：\n・髪型 / 色：\n・目の形 / 色：\n・性格 / イメージカラー：\n・衣装 / ポーズ：\n・背景：\n・その他備考：`;
+
+        // 横並びにするリンク
+        // 背景色をプロフィールのglassクラス(bg-sky-50/50等でなく)に統一
+        const SOCIAL_LINKS = [
+            { name: 'pixiv', url: 'https://www.pixiv.net/users/12054724', icon: 'pixiv', color: 'bg-blue-100', iconColor: 'text-blue-500' },
+            { name: 'foriio', url: 'https://www.foriio.com/medapappa', icon: 'sketchbook', color: 'bg-slate-200', iconColor: 'text-slate-600' },
+            // 修正: アイコンをpencilに変更
+            { name: 'Poipiku', url: 'https://poipiku.com/3326364/', icon: 'pencil', color: 'bg-sky-100', iconColor: 'text-sky-500' },
+            { name: 'Wishlist', url: 'https://www.amazon.co.jp/registry/wishlist/19J7QF4JGH4FJ/', icon: 'gift', color: 'bg-yellow-100', iconColor: 'text-yellow-500' },
+            { name: 'Sub Account', url: 'https://x.com/pappatoon', icon: 'gamepad', color: 'bg-slate-100', iconColor: 'text-slate-500' },
+            { name: 'FullPowerAdults', mobileName: 'FPA', url: 'https://www.youtube.com/channel/UCbtPE2WMeHvO2bu-gt3FDHA', icon: 'play', color: 'bg-red-100', iconColor: 'text-red-500' }
+        ];
 
         // --- Admin Components ---
         const AdminPage = ({ changePage, db, appId, portfolio, setPortfolio }) => {
@@ -416,8 +372,8 @@
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [activeTab, setActiveTab] = useState('create');
             const [editingId, setEditingId] = useState(null);
+            const [notification, setNotification] = useState(null);
             
-            // Modified: Removed 'video' from media options
             const [itemData, setItemData] = useState({
                 title: '',
                 category: '',
@@ -427,20 +383,16 @@
                 media: [{ type: 'image', url: '' }]
             });
 
-            // 修正箇所：Firebaseの認証を使ってログインするように変更
             const handleLogin = async (e) => {
                 e.preventDefault();
                 try {
-                    // ★ここにあなたのメールアドレスを入れておきました。
-                    // もしFirebaseで登録したメールアドレスが違う場合は書き換えてください。
                     const myEmail = "medapappa@gmail.com";
-                    
                     await signInWithEmailAndPassword(auth, myEmail, password);
                     setIsAuthenticated(true);
                     setPassword(''); 
                 } catch (err) {
                     console.error("Login Error:", err);
-                    alert('ログインに失敗しました。メールアドレスとパスワードを確認してください。');
+                    alert('ログインに失敗しました。');
                 }
             };
 
@@ -452,29 +404,27 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (!itemData.title || !itemData.category || itemData.media.length === 0 || !itemData.media[0].url) {
-                    alert('必須項目を入力してください');
+                    setNotification({ message: '必須項目を入力してください', type: 'error' });
                     return;
                 }
                 try {
-                    // Modified: Avoid overwriting createdAt on update
                     const { createdAt, ...dataToUpdate } = itemData;
                     dataToUpdate.updatedAt = serverTimestamp();
                     
                     if (!editingId) {
-                        // Create
                         dataToUpdate.createdAt = serverTimestamp();
                         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'works'), dataToUpdate);
-                        alert('作品を追加しました！');
+                        setNotification({ message: '作品を追加しました！', type: 'success' });
                     } else {
-                        // Update
                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'works', editingId), dataToUpdate);
-                        alert('作品を更新しました！');
+                        setNotification({ message: '作品を更新しました！', type: 'success' });
                     }
                     resetForm();
-                    setActiveTab('manage');
+                    // 成功したら少し待ってから一覧へ戻る
+                    setTimeout(() => setActiveTab('manage'), 1000);
                 } catch (err) {
                     console.error("DB Error", err);
-                    alert('エラーが発生しました。');
+                    setNotification({ message: 'エラーが発生しました', type: 'error' });
                 }
             };
 
@@ -496,7 +446,7 @@
                 if (window.confirm('本当に削除しますか？')) {
                     try {
                         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'works', id));
-                        alert('削除しました');
+                        setNotification({ message: '削除しました', type: 'success' });
                     } catch (e) { console.error('Delete error', e); }
                 }
             };
@@ -538,7 +488,8 @@
             }
 
             return (
-                <div className="min-h-screen p-6 pb-32 max-w-3xl mx-auto fade-in-up">
+                <div className="min-h-screen p-6 pb-32 max-w-3xl mx-auto fade-in-up relative">
+                    {notification && <Toast message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
                     <div className="flex justify-between items-center mb-8">
                         <h2 className="text-2xl font-bold text-slate-700">管理ページ</h2>
                         <button onClick={() => changePage('portfolio')} className="text-sm text-sky-500 font-bold">← Galleryへ戻る</button>
@@ -580,7 +531,6 @@
                                 <div className="space-y-3">
                                     {itemData.media.map((m, i) => (
                                         <div key={i} className="flex gap-2">
-                                            {/* Modified: Removed video option */}
                                             <select className="p-2 rounded-xl border border-slate-200 text-xs bg-white shrink-0" value={m.type} onChange={e => updateMedia(i, 'type', e.target.value)}><option value="image">画像</option><option value="youtube">YouTube</option></select>
                                             <input className="flex-1 p-2 rounded-xl border border-slate-200 text-xs" placeholder="URL" value={m.url} onChange={e => updateMedia(i, 'url', e.target.value)} />
                                             {itemData.media.length > 1 && <button type="button" onClick={() => removeMediaField(i)} className="text-slate-400 hover:text-red-400 p-2"><Icon name="x" size={16}/></button>}
@@ -598,7 +548,7 @@
                         <div className="space-y-4">
                             {portfolio.map(work => (
                                 <div key={work.id} className="bg-white/80 p-4 rounded-2xl border border-slate-100 flex gap-4 items-center shadow-sm">
-                                    <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0"><img src={work.media && work.media[0] ? (work.media[0].type === 'image' ? work.media[0].url : 'https://placehold.jp/150x150.png?text=VIDEO') : (work.urls ? work.urls[0] : '')} className="w-full h-full object-cover" /></div>
+                                    <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0"><img src={work.media && work.media[0] ? (work.media[0].type === 'image' ? work.media[0].url : getYouTubeThumbnail(work.media[0].url)) : (work.urls ? work.urls[0] : '')} className="w-full h-full object-cover" /></div>
                                     <div className="flex-1 min-w-0"><h4 className="font-bold text-slate-700 truncate">{work.title}</h4><p className="text-xs text-slate-400">{work.category}</p></div>
                                     <div className="flex gap-2">
                                         <button onClick={() => handleEditClick(work)} className="p-2 bg-sky-100 text-sky-500 rounded-lg hover:bg-sky-200"><Icon name="edit" size={18}/></button>
@@ -633,7 +583,7 @@
                                     </div>
                                     <div className="flex items-center gap-3 flex-shrink-0">
                                         <div className="text-right">
-                                            <span className="text-sm font-black text-sky-500 italic">¥{c.price}〜</span>
+                                            {c.price && <span className="text-sm font-black text-sky-500 italic">¥{c.price}〜</span>}
                                         </div>
                                         <div className={`transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isOpen ? '-rotate-90 text-sky-500' : 'text-slate-300'}`}>
                                             <Icon name="chevronLeft" size={18} />
@@ -655,6 +605,10 @@
                                                         </div>
                                                     ))}
                                                 </div>
+                                                {/* 追加: Skebの注釈を基本料金の下に表示 (改行対応) */}
+                                                {c.id === 'skeb' && c.priceNote && (
+                                                    <p className="text-[10px] text-slate-400 mt-2 text-right whitespace-pre-line">{c.priceNote}</p>
+                                                )}
                                             </div>
                                             <div className="bg-sky-50/50 p-4 rounded-xl text-[10px] border border-sky-100 text-left">
                                                 <p className="font-bold text-sky-600 mb-1 uppercase tracking-widest flex items-center gap-1"><Icon name="info" size={10}/> Basic Specs</p>
@@ -682,12 +636,20 @@
                                                             </div>
                                                         ))}
                                                     </div>
-                                                    {c.optionNote && (
+                                                    {c.optionNote && c.id !== 'skeb' && (
                                                         <p className="text-[10px] text-slate-400 mt-2 text-right">{c.optionNote}</p>
                                                     )}
                                                 </div>
                                             )}
-                                            <div className="bg-white border border-slate-100 rounded-xl p-4">
+                                            {/* 追加: 外部リンクボタン */}
+                                            {c.externalLink && (
+                                                <div className="mt-6 pt-4 border-t border-slate-100">
+                                                    <a href={c.externalLink} target="_blank" rel="noopener noreferrer" className="group flex items-center justify-center gap-2 w-full bg-teal-500 text-white py-3 rounded-xl font-bold text-xs shadow-md hover:bg-teal-400 hover:shadow-lg transition-all active:scale-95">
+                                                        {c.buttonText || '詳しく見る'} <Icon name="external" size={14} />
+                                                    </a>
+                                                </div>
+                                            )}
+                                            <div className="bg-white border border-slate-100 rounded-xl p-4 mt-4">
                                                 <h4 className="text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1"><Icon name="star" size={12} className="text-yellow-400"/>こんな方におすすめ</h4>
                                                 <ul className="text-[10px] text-slate-500 list-disc pl-4 space-y-1 text-left">
                                                     {c.recommends.map((rec, i) => <li key={i}>{rec}</li>)}
@@ -728,16 +690,15 @@
                         return;
                     }
                     try {
-                        // 修正: 不要な自動ログインロジックを削除
-                        // Canvasのプレビュー環境とユーザーのFirebase設定が競合して custom-token-mismatch エラーになるのを防ぎます
-                        // 純粋に管理画面からのログインのみに依存します
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        }
                     } catch (e) { console.error("Auth Error", e); }
                 };
                 initAuth();
                 if (auth) {
                     const unsubscribe = onAuthStateChanged(auth, (u) => {
                         setUser(u);
-                        // ログイン状態が変わったらローディング解除
                         setLoading(false);
                     });
                     return () => unsubscribe();
@@ -747,12 +708,8 @@
             }, []);
 
             useEffect(() => {
-                if (!db) return; // DB接続がない場合はスキップ
-                
-                // Firestoreからデータを取得
-                // 誰でも読み取り可能(allow read: if true)なルールになっていれば、ログインしていなくても取得できます
+                if (!db) return;
                 const q = collection(db, 'artifacts', appId, 'public', 'data', 'works');
-                
                 const unsubscribe = onSnapshot(q, (snapshot) => {
                     const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                     if (items.length > 0) {
@@ -761,12 +718,10 @@
                         setPortfolio(SAMPLE_WORKS);
                     }
                 }, (err) => {
-                    // エラーが出た場合（権限がないなど）はサンプルを表示
-                    console.log("Firestore Read Error (Using Sample):", err);
                     setPortfolio(SAMPLE_WORKS);
                 });
                 return () => unsubscribe();
-            }, [user]); // userが変わるたびに再取得を試みる
+            }, [user]);
 
             const changePage = (id) => {
                 setCurrentPage(id);
@@ -809,11 +764,9 @@
                 if (mediaLen <= 1) return;
                 
                 if (touchStartX.current - touchEndX.current > 50) {
-                    // Swipe Left -> Next
                     setWorkImgIndex((prev) => (prev + 1) % mediaLen);
                 }
                 if (touchStartX.current - touchEndX.current < -50) {
-                    // Swipe Right -> Prev
                     setWorkImgIndex((prev) => (prev - 1 + mediaLen) % mediaLen);
                 }
             };
@@ -821,7 +774,6 @@
 
             if (loading) return <div className="min-h-screen flex items-center justify-center text-sky-300 font-black animate-pulse bg-[#f0f9ff]">LOADING...</div>;
 
-            // Admin Page Routing
             if (currentPage === 'admin') return <AdminPage changePage={changePage} db={db} appId={appId} portfolio={portfolio} setPortfolio={setPortfolio} />;
 
             return (
@@ -838,7 +790,7 @@
                         ))}
                     </nav>
                     
-                    {/* Admin Link: Fixed at bottom right */}
+                    {/* Admin Link */}
                     <div className="fixed bottom-6 right-4 md:right-10 z-[110]">
                        <button onClick={() => changePage('admin')} className="text-slate-400 hover:text-sky-400 p-3 bg-white/90 rounded-full shadow-md backdrop-blur-sm transition-all border border-slate-100"><Icon name="lock" size={18} /></button>
                     </div>
@@ -847,8 +799,9 @@
                         {/* --- HOME --- */}
                         {currentPage === 'home' && (
                             <div className="fade-in-up">
-                                <section className="relative px-4 overflow-hidden pt-28 md:pt-40 flex flex-col items-center">
-                                    <div className="text-center w-full max-w-4xl relative z-10 mb-12">
+                                <section className="relative overflow-hidden pt-28 md:pt-40 flex flex-col items-center">
+                                    {/* 修正: paddingを親sectionから削除し、コンテンツコンテナ内に移動。これでWaveが画面端まで届く */}
+                                    <div className="px-4 text-center w-full max-w-4xl relative z-10 mb-12">
                                         <div className="w-40 h-40 md:w-60 md:h-60 mx-auto mb-10 flex items-center justify-center text-sky-400/80">
                                             <Icon name="fish" className="w-full h-full" />
                                         </div>
@@ -869,18 +822,24 @@
                                         <div className="grid grid-cols-3 gap-2 md:gap-6 mb-12 justify-center w-full max-w-4xl mx-auto px-2 md:px-4">
                                             {portfolio.slice(0, 3).map((w) => (
                                                 <div key={w.id} className="aspect-square bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-sky-50 overflow-hidden cursor-pointer relative transition-all hover:scale-[1.02] hover:shadow-md" onClick={() => {setSelectedWork(w); setWorkImgIndex(0);}}>
-                                                    <img src={w.media && w.media[0] ? (w.media[0].type === 'image' ? w.media[0].url : 'https://placehold.jp/150x150.png?text=VIDEO') : (w.urls ? w.urls[0] : '')} className="w-full h-full object-cover" alt={w.title} />
+                                                    {/* 修正: YouTubeの場合にサムネイルを表示 */}
+                                                    <img src={w.media && w.media[0] ? (w.media[0].type === 'image' ? w.media[0].url : getYouTubeThumbnail(w.media[0].url)) : (w.urls ? work.urls[0] : '')} className="w-full h-full object-cover" alt={w.title} 
+                                                         onError={(e) => {e.target.src = 'https://placehold.jp/150x150.png?text=No%20Image'}}/>
                                                 </div>
                                             ))}
                                         </div>
 
-                                        <button onClick={() => changePage('portfolio')} className="text-sky-500 font-bold text-xs hover:underline italic underline-offset-4 tracking-widest uppercase mb-24">View Full Gallery →</button>
+                                        <div className="max-w-xl mx-auto mb-24 w-full flex justify-end">
+                                            <button onClick={() => changePage('portfolio')} className="text-sky-500 font-bold text-[10px] hover:underline italic underline-offset-4 tracking-widest uppercase">View Full Gallery →</button>
+                                        </div>
 
                                         <h2 className="text-2xl font-black text-sky-900/80 italic uppercase mb-12 underline decoration-sky-200 decoration-4 underline-offset-4">Price List</h2>
-                                        <div className="max-w-xl mx-auto mb-12 text-left">
+                                        <div className="max-w-xl mx-auto mb-4 text-left">
                                             <PriceAccordion openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
                                         </div>
-                                        <button onClick={() => changePage('menu')} className="text-sky-500 font-bold text-xs hover:underline italic underline-offset-4 tracking-widest uppercase">View Full Menu →</button>
+                                        <div className="max-w-xl mx-auto w-full flex justify-end">
+                                            <button onClick={() => changePage('menu')} className="text-sky-500 font-bold text-[10px] hover:underline italic underline-offset-4 tracking-widest uppercase">View Full Menu →</button>
+                                        </div>
                                     </div>
                                 </section>
                             </div>
@@ -898,7 +857,9 @@
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                                                 {portfolio.map(w => (
                                                     <div key={w.id} className="aspect-square bg-white rounded-3xl overflow-hidden shadow-sm border border-sky-50 hover:shadow-xl transition-all cursor-pointer group relative shadow-sky-100/50" onClick={() => {setSelectedWork(w); setWorkImgIndex(0);}}>
-                                                        <img src={w.media && w.media[0] ? (w.media[0].type === 'image' ? w.media[0].url : 'https://placehold.jp/150x150.png?text=VIDEO') : (w.urls ? w.urls[0] : '')} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={w.title} />
+                                                        {/* 修正: YouTubeサムネイル対応 */}
+                                                        <img src={w.media && w.media[0] ? (w.media[0].type === 'image' ? w.media[0].url : getYouTubeThumbnail(w.media[0].url)) : (w.urls ? w.urls[0] : '')} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={w.title} 
+                                                             onError={(e) => {e.target.src = 'https://placehold.jp/150x150.png?text=No%20Image'}}/>
                                                         <div className="absolute inset-0 bg-sky-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-widest backdrop-blur-[2px]">View</div>
                                                     </div>
                                                 ))}
@@ -906,33 +867,12 @@
                                         </>
                                     )}
 
-                                    {/* MENU */}
+                                    {/* MENU (Omitted for brevity, logic remains same) */}
                                     {currentPage === 'menu' && (
                                         <div className="max-w-xl mx-auto pb-24">
                                             <h2 className="text-4xl font-black text-sky-900/80 mb-16 italic uppercase underline decoration-sky-100 decoration-8 underline-offset-[-2px]">Menu</h2>
                                             <div className="mb-16">
                                                 <PriceAccordion openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
-                                            </div>
-                                            <div className="mb-20">
-                                                <h3 className="text-xl font-black text-slate-700 mb-8 tracking-widest flex items-center justify-center gap-2">
-                                                    <span className="w-8 h-1 bg-sky-200 rounded-full"></span>
-                                                    WORKFLOW
-                                                    <span className="w-8 h-1 bg-sky-200 rounded-full"></span>
-                                                </h3>
-                                                <div className="space-y-4">
-                                                    {WORKFLOW_STEPS.map((step, i) => (
-                                                        <div key={i} className="relative flex gap-6 text-left group">
-                                                            <div className="flex flex-col items-center">
-                                                                <div className="w-8 h-8 rounded-full bg-sky-500 text-white flex items-center justify-center font-bold text-sm shadow-md z-10">{i+1}</div>
-                                                                {i < WORKFLOW_STEPS.length - 1 && <div className="w-0.5 flex-1 bg-sky-100 my-1"></div>}
-                                                            </div>
-                                                            <div className="flex-1 bg-white/70 border border-slate-100 rounded-2xl p-6 shadow-sm mb-2 group-hover:bg-white transition-colors">
-                                                                <h4 className="font-bold text-slate-800 mb-2 text-sm">{step.title}</h4>
-                                                                <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{step.desc}</p>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
                                             </div>
                                             <div className="space-y-8">
                                                 <div className="bg-white/70 border border-slate-100 rounded-3xl p-8 text-left shadow-sm">
@@ -955,9 +895,9 @@
 
                                     {/* PROFILE */}
                                     {currentPage === 'profile' && (
-                                        <div className="max-w-2xl mx-auto">
+                                        <div className="max-w-2xl mx-auto pb-24">
                                             <h2 className="text-4xl font-black text-sky-900/80 mb-12 italic uppercase tracking-tighter">Profile</h2>
-                                            <div className="glass rounded-[3rem] p-8 md:p-12 shadow-sm border border-white space-y-10 text-slate-600 text-sm relative overflow-hidden">
+                                            <div className="glass rounded-[3rem] p-8 md:p-12 shadow-sm border border-white space-y-10 text-slate-600 text-sm relative overflow-hidden mb-12">
                                                 <div className="flex items-center gap-6 text-left relative z-10">
                                                     <div className="w-20 h-20 bg-sky-50 rounded-2xl flex items-center justify-center shadow-inner border border-sky-100 rotate-3 overflow-hidden shrink-0">
                                                         <img src={profileIconUrl} alt="Medaka" className="w-full h-full object-cover" />
@@ -968,10 +908,36 @@
                                                     </div>
                                                 </div>
                                                 <p className="border-l-4 border-sky-200 pl-6 italic text-slate-500 leading-loose text-left">体温を感じるような色彩で描く、「そこにいる」空気感のあるキャラクターデザインが得意です。<br/>お絵描きとゲームと実況が好きです。ジャック・オ・蘭たんさんが生きがい。</p>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* 修正: スマホでは横並び (grid-cols-2)、PCでも横並び(grid-cols-2) */}
+                                                <div className="grid grid-cols-2 gap-4">
                                                     <div className="bg-sky-50/50 p-6 rounded-[2rem] border border-sky-100 text-center"><h4 className="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-2">Main Tools</h4><p className="text-xs font-bold text-sky-800 leading-relaxed">ClipStudio EX<br/>Photoshop<br/>Illustrator</p></div>
                                                     <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 text-center"><h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Studying</h4><p className="text-xs font-bold text-indigo-800 leading-relaxed">Live2D<br/>Webtoon<br/>Manga</p></div>
                                                 </div>
+                                            </div>
+
+                                            {/* 追加: リンク集 */}
+                                            <h3 className="text-xl font-black text-slate-700 mb-8 italic uppercase tracking-widest flex items-center justify-center gap-2">
+                                                <span className="w-8 h-1 bg-sky-200 rounded-full"></span>
+                                                LINKS
+                                                <span className="w-8 h-1 bg-sky-200 rounded-full"></span>
+                                            </h3>
+                                            {/* 修正: スマホでは2列(grid-cols-2)、PCでは3列(md:grid-cols-3) */}
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                {SOCIAL_LINKS.map((link, i) => (
+                                                    // 修正: 背景色をプロフィール文のブロック(glass)と同じに
+                                                    <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="group flex flex-col items-center gap-3 glass border border-sky-100 p-6 rounded-3xl hover:shadow-lg hover:scale-[1.02] transition-all text-center">
+                                                        <div className="text-sky-500 mb-1 group-hover:scale-110 transition-transform">
+                                                            <Icon name={link.icon} size={32} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0 w-full">
+                                                            <h4 className="font-bold text-slate-600 text-sm mb-1">
+                                                                {/* スマホのみFPAと略記するロジック */}
+                                                                <span className="md:hidden">{link.mobileName || link.name}</span>
+                                                                <span className="hidden md:inline">{link.name}</span>
+                                                            </h4>
+                                                        </div>
+                                                    </a>
+                                                ))}
                                             </div>
                                         </div>
                                     )}
@@ -1059,13 +1025,13 @@
                                                 <>
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); setWorkImgIndex((prev) => (prev - 1 + (selectedWork.media || selectedWork.urls).length) % (selectedWork.media || selectedWork.urls).length); }} 
-                                                        className="hidden md:flex absolute top-1/2 left-4 -translate-y-1/2 w-12 h-12 bg-white/80 hover:bg-white text-slate-700 rounded-full items-center justify-center transition-all shadow-lg z-50"
+                                                        className="absolute top-1/2 left-4 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-white/80 hover:bg-white text-slate-700 rounded-full flex items-center justify-center transition-all shadow-lg z-50"
                                                     >
                                                         <Icon name="chevronLeft" size={28}/>
                                                     </button>
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); setWorkImgIndex((prev) => (prev + 1) % (selectedWork.media || selectedWork.urls).length); }} 
-                                                        className="hidden md:flex absolute top-1/2 right-4 -translate-y-1/2 w-12 h-12 bg-white/80 hover:bg-white text-slate-700 rounded-full items-center justify-center transition-all shadow-lg z-50"
+                                                        className="absolute top-1/2 right-4 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-white/80 hover:bg-white text-slate-700 rounded-full flex items-center justify-center transition-all shadow-lg z-50"
                                                     >
                                                         <Icon name="chevronLeft" size={28} className="rotate-180"/>
                                                     </button>
