@@ -145,7 +145,7 @@
     <!-- Firebase SDK & App Logic -->
     <script type="text/babel" data-type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
+        import { getAuth, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
         import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
         
         const { useState, useEffect, useMemo, useRef } = React;
@@ -989,18 +989,10 @@
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
                         }
                     } catch (e) { 
-                        console.error("Auth Error, falling back to anonymous:", e);
-                        try {
-                            await signInAnonymously(auth);
-                        } catch (anonErr) {
-                            console.error("Anonymous Login Failed:", anonErr);
-                        }
+                        console.error("Auth Error:", e);
                     } finally {
-                        // 修正: 認証に失敗しても無限ロードにならないよう、最後に必ずloadingをfalseにする
                         setLoading(false); 
                     }
                 };
