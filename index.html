@@ -44,6 +44,18 @@
             min-height: 0;
         }
 
+        /* --- Image Protection --- */
+        img {
+            -webkit-user-drag: none;
+            -khtml-user-drag: none;
+            -moz-user-drag: none;
+            -o-user-drag: none;
+            user-drag: none;
+            -webkit-touch-callout: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
         /* --- Animations --- */
         @keyframes floatUp {
             0% { transform: translateY(0) scale(1); opacity: 0; }
@@ -2254,7 +2266,7 @@
                     {/* Full Screen */}
                     {fullScreenUrl && (
                         <div className="fixed inset-0 z-[300] bg-white/95 backdrop-blur-xl flex items-center justify-center p-4 cursor-zoom-out animate-fade-in" onClick={() => setFullScreenUrl(null)}>
-                            <img src={fullScreenUrl} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-lg" />
+                            <img src={fullScreenUrl} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-lg pointer-events-none" />
                             <button className="absolute top-6 right-6 p-4 bg-slate-100 rounded-full hover:bg-slate-200 transition-all"><Icon name="x" size={24} /></button>
                         </div>
                     )}
@@ -2264,6 +2276,10 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
+
+        document.addEventListener('contextmenu', (e) => {
+            if (e.target.tagName === 'IMG') e.preventDefault();
+        });
     </script>
 </body>
 </html>
